@@ -548,7 +548,7 @@ pattern = "{date:YYYY-MM-DD}_{name}.{ext}"`}</code></pre>
   .docs-layout {
     display: flex;
     padding-top: var(--nav-height);
-    min-height: 100vh;
+    min-height: calc(100vh - var(--nav-height));
   }
   
   .docs-sidebar {
