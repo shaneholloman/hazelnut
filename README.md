@@ -101,11 +101,21 @@ Human-readable TOML config that's easy to write and maintain.
 
 ### Installation
 
-```bash
-# From crates.io (coming soon)
-cargo install tidy
+#### Homebrew (Recommended)
 
-# Or build from source
+```bash
+brew install ricardodantas/tap/tidy
+```
+
+#### Cargo
+
+```bash
+cargo install tidy-cli
+```
+
+#### From Source
+
+```bash
 git clone https://github.com/ricardodantas/tidy
 cd tidy
 cargo install --path .
