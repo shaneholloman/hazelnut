@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
 
-use super::state::{AppState, LogLevel, Mode, SettingsItem, View};
+use super::state::{AppState, LogLevel, Mode, RuleEditorField, SettingsItem, View};
 use crate::config::Config;
 use crate::theme::Theme;
 
@@ -856,8 +856,6 @@ fn get_settings_value_display(state: &AppState, item: SettingsItem) -> String {
 }
 
 fn render_rule_editor(frame: &mut Frame, state: &AppState) {
-    use super::state::RuleEditorField;
-    
     let colors = state.theme.colors();
     let area = frame.area();
 
@@ -867,7 +865,7 @@ fn render_rule_editor(frame: &mut Frame, state: &AppState) {
 
     // Calculate popup size - wider for the editor
     let popup_width = 70u16.min(area.width.saturating_sub(4));
-    let popup_height = 26u16.min(area.height.saturating_sub(4));
+    let popup_height = 28u16.min(area.height.saturating_sub(4));
 
     let popup_area = Rect {
         x: (area.width - popup_width) / 2,
@@ -1007,6 +1005,12 @@ fn render_rule_editor(frame: &mut Frame, state: &AppState) {
             Span::styled("Command:     ", label_style(RuleEditorField::ActionCommand)),
             Span::styled(if editor.action_command.is_empty() { "(none)" } else { &editor.action_command }, field_style(RuleEditorField::ActionCommand)),
         ]),
+        Line::from(""),
+        // Contextual help line
+        Line::from(vec![
+            Span::styled("  💡 ", colors.text_dim()),
+            Span::styled(field_help(editor.field), colors.text_muted().add_modifier(Modifier::ITALIC)),
+        ]),
     ];
 
     let editor_widget = Paragraph::new(content)
@@ -1018,11 +1022,33 @@ fn render_rule_editor(frame: &mut Frame, state: &AppState) {
                 .style(Style::default().bg(colors.bg))
                 .title(title)
                 .title_style(colors.text_primary())
-                .title_bottom(Line::from(" Tab: next │ ↵: save │ Esc: cancel ").centered()),
+                .title_bottom(Line::from(" Tab: next field │ Enter: save │ Esc: cancel ").centered()),
         )
         .wrap(Wrap { trim: false });
 
     frame.render_widget(editor_widget, popup_area);
+}
+
+/// Returns contextual help text for each rule editor field
+fn field_help(field: RuleEditorField) -> &'static str {
+    use RuleEditorField::*;
+    match field {
+        Name => "Type a descriptive name for this rule",
+        Enabled => "Space/←→ to toggle on/off",
+        Extension => "e.g. 'pdf', 'jpg' — leave empty for any",
+        NameGlob => "Glob pattern, e.g. 'Screenshot*.png' or '*.tmp'",
+        NameRegex => "Regex pattern, e.g. '^invoice_\\d+\\.pdf$'",
+        SizeGreater => "Type bytes (e.g. 1048576 = 1MB) — files larger than this",
+        SizeLess => "Type bytes — files smaller than this",
+        AgeGreater => "Type days — files older than this many days",
+        AgeLess => "Type days — files newer than this many days",
+        IsDirectory => "Space/←→ to cycle: Any → Yes → No",
+        IsHidden => "Space/←→ to cycle: Any → Yes → No",
+        ActionType => "←→ or Space to change action type",
+        ActionDestination => "Target folder path, e.g. ~/Documents/PDFs",
+        ActionPattern => "Rename pattern, e.g. '{name}_{date}.{ext}'",
+        ActionCommand => "Command to run, e.g. 'convert' or '/usr/bin/script.sh'",
+    }
 }
 
 fn render_about_dialog(frame: &mut Frame, state: &AppState) {
