@@ -17,13 +17,13 @@ const baseUrl = import.meta.env.BASE_URL;
     <link rel="icon" type="image/svg+xml" href={`${baseUrl}favicon.svg`} />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
-    
+
     <!-- Open Graph -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:image" content={`${baseUrl}og-image.png`} />
-    
+
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
@@ -54,14 +54,14 @@ const baseUrl = import.meta.env.BASE_URL;
         </button>
       </div>
     </nav>
-    
+
     <main>
       <slot />
     </main>
-    
+
     <footer>
       <div class="footer-container">
-        <p>Made with ❤️ for terminal enthusiasts</p>
+        <p>Made with ❤️ and 🦀 for terminal enthusiasts</p>
         <p class="footer-links">
           <a href="https://github.com/ricardodantas/hazelnut" target="_blank" rel="noopener">GitHub</a>
           <span>•</span>
@@ -89,25 +89,25 @@ const baseUrl = import.meta.env.BASE_URL;
     --accent-purple: #bd93f9;
     --accent-red: #ff5555;
     --accent-yellow: #f1fa8c;
-    
+
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    
+
     --max-width: 1200px;
     --nav-height: 64px;
   }
-  
+
   * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
   }
-  
+
   html {
     scroll-behavior: smooth;
     font-size: 16px;
   }
-  
+
   body {
     font-family: var(--font-sans);
     background: var(--bg-primary);
@@ -117,21 +117,21 @@ const baseUrl = import.meta.env.BASE_URL;
     display: flex;
     flex-direction: column;
   }
-  
+
   main {
     flex: 1;
   }
-  
+
   a {
     color: var(--accent-purple);
     text-decoration: none;
     transition: color 0.2s;
   }
-  
+
   a:hover {
     color: var(--accent-pink);
   }
-  
+
   code {
     font-family: var(--font-mono);
     background: var(--bg-tertiary);
@@ -139,7 +139,7 @@ const baseUrl = import.meta.env.BASE_URL;
     border-radius: 4px;
     font-size: 0.9em;
   }
-  
+
   pre {
     font-family: var(--font-mono);
     background: var(--bg-secondary);
@@ -148,13 +148,13 @@ const baseUrl = import.meta.env.BASE_URL;
     overflow-x: auto;
     border: 1px solid var(--bg-tertiary);
   }
-  
+
   pre code {
     background: none;
     padding: 0;
     font-size: 0.875rem;
   }
-  
+
   /* Navbar */
   .navbar {
     position: fixed;
@@ -167,7 +167,7 @@ const baseUrl = import.meta.env.BASE_URL;
     border-bottom: 1px solid var(--bg-tertiary);
     z-index: 1000;
   }
-  
+
   .nav-container {
     max-width: var(--max-width);
     margin: 0 auto;
@@ -177,7 +177,7 @@ const baseUrl = import.meta.env.BASE_URL;
     align-items: center;
     justify-content: space-between;
   }
-  
+
   .nav-logo {
     display: flex;
     align-items: center;
@@ -186,37 +186,37 @@ const baseUrl = import.meta.env.BASE_URL;
     font-weight: 700;
     color: var(--text-primary);
   }
-  
+
   .nav-logo:hover {
     color: var(--text-primary);
   }
-  
+
   .logo-icon {
     font-size: 1.5rem;
   }
-  
+
   .nav-links {
     display: flex;
     align-items: center;
     gap: 2rem;
   }
-  
+
   .nav-links a {
     color: var(--text-secondary);
     font-weight: 500;
     transition: color 0.2s;
   }
-  
+
   .nav-links a:hover {
     color: var(--text-primary);
   }
-  
+
   .github-link {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
-  
+
   .nav-toggle {
     display: none;
     flex-direction: column;
@@ -226,7 +226,7 @@ const baseUrl = import.meta.env.BASE_URL;
     cursor: pointer;
     padding: 4px;
   }
-  
+
   .nav-toggle span {
     display: block;
     width: 24px;
@@ -234,7 +234,7 @@ const baseUrl = import.meta.env.BASE_URL;
     background: var(--text-primary);
     transition: transform 0.2s;
   }
-  
+
   /* Footer */
   footer {
     background: var(--bg-secondary);
@@ -244,29 +244,29 @@ const baseUrl = import.meta.env.BASE_URL;
     width: 100%;
     flex-shrink: 0;
   }
-  
+
   .footer-container {
     max-width: var(--max-width);
     margin: 0 auto;
   }
-  
+
   .footer-links {
     margin-top: 0.5rem;
     color: var(--text-secondary);
   }
-  
+
   .footer-links a {
     color: var(--text-secondary);
   }
-  
+
   .footer-links a:hover {
     color: var(--accent-purple);
   }
-  
+
   .footer-links span {
     margin: 0 0.5rem;
   }
-  
+
   /* Mobile */
   @media (max-width: 768px) {
     .nav-links {
@@ -281,26 +281,26 @@ const baseUrl = import.meta.env.BASE_URL;
       gap: 1rem;
       border-bottom: 1px solid var(--bg-tertiary);
     }
-    
+
     .nav-links.active {
       display: flex;
     }
-    
+
     .nav-toggle {
       display: flex;
     }
-    
+
     footer {
       padding: 1.5rem 1rem;
     }
-    
+
     .footer-links {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
       align-items: center;
     }
-    
+
     .footer-links span {
       display: none;
     }
