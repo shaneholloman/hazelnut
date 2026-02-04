@@ -1,6 +1,6 @@
-# Tidy Website
+# Hazelnut Website
 
-The official website for Tidy, built with [Astro](https://astro.build).
+The official website for Hazelnut, built with [Astro](https://astro.build).
 
 ## 🚀 Quick Start
 
@@ -63,7 +63,7 @@ npm run build
 
 ### Configuration
 
-The site is configured to work with the `/tidy` base path for GitHub Pages. If you're hosting elsewhere, update `astro.config.mjs`:
+The site is configured to work with the `/hazelnut` base path for GitHub Pages. If you're hosting elsewhere, update `astro.config.mjs`:
 
 ```js
 export default defineConfig({
@@ -126,4 +126,4 @@ Edit `src/pages/themes.astro` and add a new entry to the `themes` array:
 
 ## 📄 License
 
-MIT - Same as the main Tidy project.
+MIT - Same as the main Hazelnut project.
