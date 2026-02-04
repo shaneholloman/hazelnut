@@ -592,7 +592,7 @@ fn handle_settings_increment(state: &mut AppState, increase: bool) {
 }
 
 fn toggle_daemon(state: &mut AppState) {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
 
     // Find hazelnutd binary - check same directory as current executable first
     let daemon_cmd = std::env::current_exe()
@@ -603,7 +603,12 @@ fn toggle_daemon(state: &mut AppState) {
 
     if state.daemon_running {
         // Stop daemon
-        match Command::new(&daemon_cmd).args(["stop"]).status() {
+        match Command::new(&daemon_cmd)
+            .args(["stop"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+        {
             Ok(status) if status.success() => {
                 state.daemon_running = false;
                 state.set_status("Daemon stopped");
@@ -617,7 +622,12 @@ fn toggle_daemon(state: &mut AppState) {
         }
     } else {
         // Start daemon
-        match Command::new(&daemon_cmd).args(["start"]).status() {
+        match Command::new(&daemon_cmd)
+            .args(["start"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+        {
             Ok(status) if status.success() => {
                 state.daemon_running = true;
                 state.set_status("Daemon started");
