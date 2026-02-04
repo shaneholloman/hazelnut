@@ -2,11 +2,28 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::state::{AppState, View};
+use super::state::{AppState, Mode, View};
+use crate::theme::Theme;
 
 /// Handle a key event and update state
 pub fn handle_key(state: &mut AppState, key: KeyEvent) {
-    // Close help popup if open
+    // Handle mode-specific input first
+    match state.mode {
+        Mode::ThemePicker => {
+            handle_theme_picker_key(state, key);
+            return;
+        }
+        Mode::Help => {
+            if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Enter) {
+                state.mode = Mode::Normal;
+                state.show_help = false;
+            }
+            return;
+        }
+        Mode::Normal => {}
+    }
+
+    // Legacy help popup support
     if state.show_help {
         if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Enter) {
             state.show_help = false;
@@ -26,6 +43,7 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) {
             return;
         }
         (_, KeyCode::Char('?')) | (_, KeyCode::F(1)) => {
+            state.mode = Mode::Help;
             state.show_help = true;
             return;
         }
@@ -54,10 +72,14 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) {
             state.view = View::Log;
             return;
         }
-        // Theme cycling
-        (_, KeyCode::Char('t')) if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            state.theme = state.theme.next();
-            state.set_status(format!("Theme: {}", state.theme.name()));
+        // Theme picker (just 't', like Feedo)
+        (_, KeyCode::Char('t')) => {
+            // Set picker index to current theme
+            state.theme_picker_index = Theme::all()
+                .iter()
+                .position(|t| *t == state.theme)
+                .unwrap_or(0);
+            state.mode = Mode::ThemePicker;
             return;
         }
         _ => {}
@@ -69,6 +91,45 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) {
         View::Rules => handle_rules_key(state, key),
         View::Watches => handle_watches_key(state, key),
         View::Log => handle_log_key(state, key),
+    }
+}
+
+fn handle_theme_picker_key(state: &mut AppState, key: KeyEvent) {
+    let themes = Theme::all();
+    let len = themes.len();
+
+    match key.code {
+        KeyCode::Esc => {
+            // Cancel - restore original theme
+            state.mode = Mode::Normal;
+        }
+        KeyCode::Enter => {
+            // Apply selected theme
+            let selected_theme = themes[state.theme_picker_index];
+            state.theme = selected_theme;
+            state.mode = Mode::Normal;
+            state.set_status(format!("Theme set to {}", selected_theme.name()));
+            // TODO: Save to config file
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            state.theme_picker_index = (state.theme_picker_index + 1) % len;
+            // Preview theme
+            state.theme = themes[state.theme_picker_index];
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            state.theme_picker_index = state.theme_picker_index.checked_sub(1).unwrap_or(len - 1);
+            // Preview theme
+            state.theme = themes[state.theme_picker_index];
+        }
+        KeyCode::Home | KeyCode::Char('g') => {
+            state.theme_picker_index = 0;
+            state.theme = themes[state.theme_picker_index];
+        }
+        KeyCode::End | KeyCode::Char('G') => {
+            state.theme_picker_index = len - 1;
+            state.theme = themes[state.theme_picker_index];
+        }
+        _ => {}
     }
 }
 

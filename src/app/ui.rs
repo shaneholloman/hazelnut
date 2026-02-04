@@ -5,10 +5,11 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
 
-use super::state::{AppState, LogLevel, View};
+use super::state::{AppState, LogLevel, Mode, View};
+use crate::theme::Theme;
 
 /// ASCII art logo for Tidy
 const LOGO: &str = r#"
@@ -46,8 +47,13 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     render_status_bar(frame, state, chunks[2]);
 
     // Render help popup if active
-    if state.show_help {
+    if state.show_help || state.mode == Mode::Help {
         render_help_popup(frame, state);
+    }
+
+    // Render theme picker if active
+    if state.mode == Mode::ThemePicker {
+        render_theme_picker(frame, state);
     }
 }
 
@@ -241,7 +247,7 @@ fn render_dashboard(frame: &mut Frame, state: &AppState, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  ", Style::default()),
-            Span::styled("[Ctrl+t]", colors.key_hint()),
+            Span::styled("[t]", colors.key_hint()),
             Span::styled(" Change theme", colors.text()),
         ]),
         Line::from(""),
@@ -505,7 +511,7 @@ fn render_status_bar(frame: &mut Frame, state: &AppState, area: Rect) {
             Span::styled(": switch views  ", colors.text_muted()),
             Span::styled("?", colors.key_hint()),
             Span::styled(": help  ", colors.text_muted()),
-            Span::styled("Ctrl+t", colors.key_hint()),
+            Span::styled("t", colors.key_hint()),
             Span::styled(": theme  ", colors.text_muted()),
             Span::styled("q", colors.key_hint()),
             Span::styled(": quit", colors.text_muted()),
@@ -576,8 +582,8 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             colors.text_primary().add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
-            Span::styled("  Ctrl+t             ", colors.key_hint()),
-            Span::styled("Cycle through themes", colors.text()),
+            Span::styled("  t                  ", colors.key_hint()),
+            Span::styled("Open theme selector", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  ?                  ", colors.key_hint()),
@@ -609,4 +615,74 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         .wrap(Wrap { trim: false });
 
     frame.render_widget(help, popup_area);
+}
+
+/// Helper to create a centered rect
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_width = r.width * percent_x / 100;
+    let popup_height = r.height * percent_y / 100;
+    Rect {
+        x: r.x + (r.width - popup_width) / 2,
+        y: r.y + (r.height - popup_height) / 2,
+        width: popup_width,
+        height: popup_height,
+    }
+}
+
+fn render_theme_picker(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let popup_area = centered_rect(50, 70, area);
+    frame.render_widget(Clear, popup_area);
+
+    let themes = Theme::all();
+    let items: Vec<ListItem> = themes
+        .iter()
+        .enumerate()
+        .map(|(i, theme)| {
+            let palette = theme.palette();
+            let selected = i == state.theme_picker_index;
+
+            // Create color preview squares
+            let preview = format!(
+                "  {} {} ",
+                if selected { "▸" } else { " " },
+                theme.name()
+            );
+
+            let style = if selected {
+                Style::default()
+                    .fg(palette.accent)
+                    .bg(palette.selection)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(palette.fg)
+            };
+
+            ListItem::new(Line::from(vec![
+                Span::styled(preview, style),
+                Span::styled("█", Style::default().fg(palette.accent)),
+                Span::styled("█", Style::default().fg(palette.secondary)),
+                Span::styled("█", Style::default().fg(palette.success)),
+                Span::styled("█", Style::default().fg(palette.warning)),
+            ]))
+        })
+        .collect();
+
+    let theme_list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(colors.primary))
+            .border_type(BorderType::Rounded)
+            .style(Style::default().bg(colors.bg))
+            .title(format!(
+                " 🎨 Select Theme ({}/{}) ",
+                state.theme_picker_index + 1,
+                themes.len()
+            ))
+            .title_bottom(Line::from(" ↑↓ navigate │ ↵ apply │ Esc cancel ").centered()),
+    );
+
+    frame.render_widget(theme_list, popup_area);
 }

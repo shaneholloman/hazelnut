@@ -5,11 +5,26 @@ use crate::rules::Rule;
 use crate::theme::Theme;
 use std::path::PathBuf;
 
+/// Input mode for the application
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Mode {
+    /// Normal navigation mode
+    #[default]
+    Normal,
+    /// Theme picker dialog
+    ThemePicker,
+    /// Help dialog
+    Help,
+}
+
 /// Main application state
 #[derive(Debug)]
 pub struct AppState {
     /// Current view/tab
     pub view: View,
+
+    /// Current input mode
+    pub mode: Mode,
 
     /// Loaded configuration
     pub config: Config,
@@ -35,11 +50,14 @@ pub struct AppState {
     /// Scroll offset for log view
     pub log_scroll: usize,
 
-    /// Show help popup
+    /// Show help popup (deprecated, use mode instead)
     pub show_help: bool,
 
     /// Animation frame counter
     pub frame: u64,
+
+    /// Theme picker index
+    pub theme_picker_index: usize,
 }
 
 /// Available views in the TUI
@@ -73,8 +91,15 @@ pub enum LogLevel {
 impl AppState {
     /// Create a new application state from config
     pub fn new(config: Config, theme: Theme) -> Self {
+        // Find current theme index
+        let theme_picker_index = Theme::all()
+            .iter()
+            .position(|t| *t == theme)
+            .unwrap_or(0);
+
         let mut state = Self {
             view: View::default(),
+            mode: Mode::default(),
             config,
             theme,
             selected_rule: None,
@@ -85,6 +110,7 @@ impl AppState {
             log_scroll: 0,
             show_help: false,
             frame: 0,
+            theme_picker_index,
         };
 
         // Add welcome log entries
