@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">
-  🧹 Hazelnut
+  🌰 Hazelnut
 </h1>
 
 <p align="center">
