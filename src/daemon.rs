@@ -91,6 +91,7 @@ async fn main() -> Result<()> {
 
 async fn run_daemon(config_path: Option<std::path::PathBuf>) -> Result<()> {
     use tokio::signal;
+    use tokio::time::{interval, Duration};
     use tracing::info;
 
     let config = hazelnut::Config::load(config_path.as_deref())?;
@@ -110,9 +111,28 @@ async fn run_daemon(config_path: Option<std::path::PathBuf>) -> Result<()> {
 
     info!("Daemon running. Press Ctrl+C to stop.");
 
-    // Wait for shutdown signal
-    signal::ctrl_c().await?;
-    info!("Shutting down...");
+    // Poll for events periodically
+    let mut poll_interval = interval(Duration::from_millis(500));
+    
+    loop {
+        tokio::select! {
+            _ = signal::ctrl_c() => {
+                info!("Shutting down...");
+                break;
+            }
+            _ = poll_interval.tick() => {
+                match watcher.process_events() {
+                    Ok(count) if count > 0 => {
+                        info!("Processed {} files", count);
+                    }
+                    Err(e) => {
+                        tracing::error!("Error processing events: {}", e);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 
     Ok(())
 }
