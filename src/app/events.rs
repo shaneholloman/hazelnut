@@ -28,6 +28,10 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) {
             handle_rule_editor_key(state, key);
             return;
         }
+        Mode::About => {
+            handle_about_key(state, key);
+            return;
+        }
         Mode::Normal => {}
     }
 
@@ -94,6 +98,11 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) {
         (_, KeyCode::Char('s')) => {
             state.settings_index = 0;
             state.mode = Mode::Settings;
+            return;
+        }
+        // About dialog
+        (KeyModifiers::CONTROL, KeyCode::Char('a')) => {
+            state.mode = Mode::About;
             return;
         }
         _ => {}
@@ -301,6 +310,19 @@ fn handle_log_key(state: &mut AppState, key: KeyEvent) {
         }
         KeyCode::End | KeyCode::Char('G') => {
             state.log_scroll = len.saturating_sub(1);
+        }
+        _ => {}
+    }
+}
+
+fn handle_about_key(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+            state.mode = Mode::Normal;
+        }
+        KeyCode::Char('g') | KeyCode::Char('G') => {
+            // Open GitHub repository
+            let _ = open::that("https://github.com/ricardodantas/tidy");
         }
         _ => {}
     }

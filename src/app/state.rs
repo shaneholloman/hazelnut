@@ -21,6 +21,8 @@ pub enum Mode {
     EditRule,
     /// Adding a new rule
     AddRule,
+    /// About dialog
+    About,
 }
 
 /// Settings menu items

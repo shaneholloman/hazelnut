@@ -66,6 +66,11 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     if matches!(state.mode, Mode::EditRule | Mode::AddRule) {
         render_rule_editor(frame, state);
     }
+
+    // Render about dialog if active
+    if state.mode == Mode::About {
+        render_about_dialog(frame, state);
+    }
 }
 
 fn render_tabs(frame: &mut Frame, state: &AppState, area: Rect) {
@@ -613,6 +618,10 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             Span::styled("Open theme selector", colors.text()),
         ]),
         Line::from(vec![
+            Span::styled("  Ctrl+a             ", colors.key_hint()),
+            Span::styled("About Tidy", colors.text()),
+        ]),
+        Line::from(vec![
             Span::styled("  ?                  ", colors.key_hint()),
             Span::styled("Toggle this help", colors.text()),
         ]),
@@ -1008,4 +1017,82 @@ fn render_rule_editor(frame: &mut Frame, state: &AppState) {
         .wrap(Wrap { trim: false });
 
     frame.render_widget(editor_widget, popup_area);
+}
+
+fn render_about_dialog(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let popup_area = centered_rect(60, 60, area);
+    frame.render_widget(Clear, popup_area);
+
+    let version = env!("CARGO_PKG_VERSION");
+    let repo = "https://github.com/ricardodantas/tidy";
+
+    let logo = [
+        "  ████████╗██╗██████╗ ██╗   ██╗",
+        "  ╚══██╔══╝██║██╔══██╗╚██╗ ██╔╝",
+        "     ██║   ██║██║  ██║ ╚████╔╝ ",
+        "     ██║   ██║██║  ██║  ╚██╔╝  ",
+        "     ██║   ██║██████╔╝   ██║   ",
+        "     ╚═╝   ╚═╝╚═════╝    ╚═╝   ",
+    ];
+
+    let mut lines: Vec<Line> = logo
+        .iter()
+        .map(|line| Line::from(Span::styled(*line, Style::default().fg(colors.primary))))
+        .collect();
+
+    lines.extend([
+        Line::from(""),
+        Line::from(Span::styled(
+            "🧹 Terminal file organizer inspired by Hazel",
+            Style::default().fg(colors.fg).add_modifier(Modifier::ITALIC),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Version: ", colors.text_muted()),
+            Span::styled(version, Style::default().fg(colors.primary).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Author: ", colors.text_muted()),
+            Span::styled("Ricardo Dantas", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("License: ", colors.text_muted()),
+            Span::styled("MIT", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("Repo: ", colors.text_muted()),
+            Span::styled(repo, Style::default().fg(colors.primary)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Built with Rust 🦀 + Ratatui",
+            colors.text_muted().add_modifier(Modifier::ITALIC),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(" [G] ", Style::default().fg(colors.primary).add_modifier(Modifier::BOLD)),
+            Span::raw("Open GitHub"),
+            Span::raw("    "),
+            Span::styled(" [Esc] ", colors.text_muted()),
+            Span::raw("Close"),
+        ]),
+    ]);
+
+    let paragraph = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(colors.primary))
+                .style(Style::default().bg(colors.bg))
+                .title(" 🧹 About Tidy ")
+                .title_style(Style::default().fg(colors.primary).add_modifier(Modifier::BOLD)),
+        );
+
+    frame.render_widget(paragraph, popup_area);
 }

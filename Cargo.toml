@@ -38,6 +38,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 regex = "1.11"
 glob = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
+open = "5.3"
 
 [dev-dependencies]
 tempfile = "3.19"
