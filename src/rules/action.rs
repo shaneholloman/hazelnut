@@ -161,17 +161,26 @@ impl Action {
             }
 
             Action::Run { command, args } => {
-                let expanded_args: Vec<String> = args
-                    .iter()
-                    .map(|a| expand_pattern(a, path).unwrap_or_else(|_| a.clone()))
-                    .collect();
+                // If args is empty and command contains spaces, split it
+                let (actual_command, base_args): (&str, Vec<&str>) = if args.is_empty() && command.contains(' ') {
+                    let parts: Vec<&str> = command.split_whitespace().collect();
+                    (parts[0], parts[1..].to_vec())
+                } else {
+                    (command.as_str(), vec![])
+                };
 
-                info!("Running: {} {:?}", command, expanded_args);
+                let mut expanded_args: Vec<String> = base_args.iter().map(|s| s.to_string()).collect();
+                expanded_args.extend(
+                    args.iter()
+                        .map(|a| expand_pattern(a, path).unwrap_or_else(|_| a.clone()))
+                );
 
-                let status = std::process::Command::new(command)
+                info!("Running: {} {:?}", actual_command, expanded_args);
+
+                let status = std::process::Command::new(actual_command)
                     .args(&expanded_args)
                     .status()
-                    .with_context(|| format!("Failed to run command: {}", command))?;
+                    .with_context(|| format!("Failed to run command: {}", actual_command))?;
 
                 if !status.success() {
                     anyhow::bail!("Command failed with status: {}", status);
