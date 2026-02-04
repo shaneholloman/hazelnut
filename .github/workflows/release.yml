@@ -141,7 +141,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../hazelnut-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip hazelnut.exe hazelnutd.exe
+          # Only package hazelnut.exe on Windows (daemon is Unix-only)
+          7z a ../../../hazelnut-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip hazelnut.exe
           cd ../../..
 
       - name: Upload artifact

@@ -1,6 +1,10 @@
 //! Hazelnut Daemon (hazelnutd)
 //!
 //! Background service that watches directories and applies rules.
+//!
+//! This daemon is Unix-only as it uses Unix signals and process management.
+
+#![cfg(unix)]
 
 use anyhow::{Context, Result};
 use clap::Parser;

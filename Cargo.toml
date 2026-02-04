@@ -12,7 +12,6 @@ categories = ["command-line-utilities", "filesystem"]
 default-run = "hazelnut"
 
 [dependencies]
-libc = "0.2"
 # TUI
 ratatui = "0.30"
 crossterm = "0.29"
@@ -50,9 +49,13 @@ predicates = "3.1"
 name = "hazelnut"
 path = "src/main.rs"
 
+# Daemon is Unix-only (uses Unix signals, libc::kill, etc.)
 [[bin]]
 name = "hazelnutd"
 path = "src/daemon.rs"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [profile.release]
 lto = true
