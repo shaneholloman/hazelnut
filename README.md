@@ -101,16 +101,31 @@ Human-readable TOML config that's easy to write and maintain.
 
 ### Installation
 
-#### Homebrew (Recommended)
+#### macOS
 
 ```bash
+# Homebrew (recommended - fast, pre-built binary)
 brew install ricardodantas/tap/hazelnut
 ```
 
-#### Cargo
+#### Linux
 
 ```bash
+# Homebrew
+brew install ricardodantas/tap/hazelnut
+
+# Or via Cargo
 cargo install hazelnut
+```
+
+#### Windows
+
+```bash
+# Via Cargo (requires Rust toolchain)
+cargo install hazelnut
+
+# Or download pre-built binary from GitHub Releases:
+# https://github.com/ricardodantas/hazelnut/releases
 ```
 
 #### From Source
@@ -120,6 +135,8 @@ git clone https://github.com/ricardodantas/hazelnut
 cd hazelnut
 cargo install --path .
 ```
+
+> **Note**: The daemon (`hazelnutd`) is only available on macOS and Linux. On Windows, only the TUI (`hazelnut`) is available.
 
 ### First Run
 
