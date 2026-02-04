@@ -284,9 +284,13 @@ destination = "~/Documents/PDFs"`}</code></pre>
         <h2>Watch Folders</h2>
         <p>Configure which directories Hazelnut monitors for changes:</p>
         
+        <div class="callout info">
+          <strong>💡 TUI Tip:</strong> You can manage watches directly in the terminal interface! Press <kbd>a</kbd> to add, <kbd>e</kbd> to edit, <kbd>d</kbd> to delete.
+        </div>
+        
         <div class="code-block">
           <pre><code>{`[[watch]]
-path = "~/Downloads"
+path = "/home/user/Downloads"  # Use full paths
 recursive = false
 rules = []  # Empty = all rules apply`}</code></pre>
         </div>
@@ -306,7 +310,7 @@ rules = []  # Empty = all rules apply`}</code></pre>
                 <td><code>path</code></td>
                 <td>string</td>
                 <td>required</td>
-                <td>Directory to watch</td>
+                <td>Directory to watch (use full paths, ~ not expanded)</td>
               </tr>
               <tr>
                 <td><code>recursive</code></td>
@@ -319,6 +323,32 @@ rules = []  # Empty = all rules apply`}</code></pre>
                 <td>array</td>
                 <td><code>[]</code></td>
                 <td>Rule names to apply (empty = all)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <h3>Watch Editor Keybindings</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><kbd>a</kbd> / <kbd>n</kbd></td>
+                <td>Add new watch folder</td>
+              </tr>
+              <tr>
+                <td><kbd>e</kbd></td>
+                <td>Edit selected watch</td>
+              </tr>
+              <tr>
+                <td><kbd>d</kbd></td>
+                <td>Delete selected watch</td>
               </tr>
             </tbody>
           </table>
@@ -614,7 +644,33 @@ pattern = "{date:YYYY-MM-DD}_{name}.{ext}"`}</code></pre>
           </table>
         </div>
         
-        <h3>Rule Editor</h3>
+        <h3>Watches View</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><kbd>a</kbd> / <kbd>n</kbd></td>
+                <td>Add new watch</td>
+              </tr>
+              <tr>
+                <td><kbd>e</kbd></td>
+                <td>Edit selected watch</td>
+              </tr>
+              <tr>
+                <td><kbd>d</kbd></td>
+                <td>Delete selected watch</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <h3>Rule Editor / Watch Editor</h3>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -634,7 +690,7 @@ pattern = "{date:YYYY-MM-DD}_{name}.{ext}"`}</code></pre>
               </tr>
               <tr>
                 <td><kbd>Enter</kbd></td>
-                <td>Save rule</td>
+                <td>Save</td>
               </tr>
               <tr>
                 <td><kbd>Esc</kbd></td>
@@ -658,6 +714,11 @@ pattern = "{date:YYYY-MM-DD}_{name}.{ext}"`}</code></pre>
   .callout.warning {
     background: rgba(250, 179, 135, 0.1);
     border-left: 4px solid var(--primary);
+  }
+  
+  .callout.info {
+    background: rgba(137, 180, 250, 0.1);
+    border-left: 4px solid #89b4fa;
   }
   
   .callout ol {

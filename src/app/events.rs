@@ -2,7 +2,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::state::{AppState, Mode, RuleEditorField, RuleEditorState, SettingsItem, View};
+use super::state::{AppState, Mode, RuleEditorField, RuleEditorState, SettingsItem, View, WatchEditorField, WatchEditorState};
 use crate::theme::Theme;
 
 /// Handle a key event and update state
@@ -26,6 +26,10 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) {
         }
         Mode::EditRule | Mode::AddRule => {
             handle_rule_editor_key(state, key);
+            return;
+        }
+        Mode::EditWatch | Mode::AddWatch => {
+            handle_watch_editor_key(state, key);
             return;
         }
         Mode::About => {
@@ -251,11 +255,18 @@ fn handle_rules_key(state: &mut AppState, key: KeyEvent) {
 }
 
 fn handle_watches_key(state: &mut AppState, key: KeyEvent) {
+    use super::state::WatchEditorState;
+    
     let len = state.config.watches.len();
+
+    // Allow adding new watches even if list is empty
+    if key.code == KeyCode::Char('a') || key.code == KeyCode::Char('n') {
+        state.watch_editor = Some(WatchEditorState::new_watch());
+        state.mode = Mode::AddWatch;
+        return;
+    }
+
     if len == 0 {
-        if key.code == KeyCode::Char('a') {
-            state.set_status("Add watch not implemented yet");
-        }
         return;
     }
 
@@ -282,11 +293,38 @@ fn handle_watches_key(state: &mut AppState, key: KeyEvent) {
         KeyCode::End | KeyCode::Char('G') => {
             state.selected_watch = Some(len.saturating_sub(1));
         }
-        KeyCode::Char('a') => {
-            state.set_status("Add watch not implemented yet");
+        KeyCode::Char('e') => {
+            // Edit selected watch
+            if let Some(idx) = state.selected_watch {
+                if let Some(watch) = state.config.watches.get(idx) {
+                    state.watch_editor = Some(WatchEditorState::from_watch(idx, watch));
+                    state.mode = Mode::EditWatch;
+                }
+            } else {
+                state.set_status("Select a watch first");
+            }
         }
         KeyCode::Char('d') | KeyCode::Delete => {
-            state.set_status("Remove watch not implemented yet");
+            // Delete selected watch
+            if let Some(idx) = state.selected_watch {
+                if idx < state.config.watches.len() {
+                    let watch_path = state.config.watches[idx].path.display().to_string();
+                    state.config.watches.remove(idx);
+                    
+                    // Update selection
+                    if state.config.watches.is_empty() {
+                        state.selected_watch = None;
+                    } else if idx >= state.config.watches.len() {
+                        state.selected_watch = Some(state.config.watches.len() - 1);
+                    }
+                    
+                    // Save config
+                    save_config(state);
+                    state.set_status(format!("Deleted watch '{}'", watch_path));
+                }
+            } else {
+                state.set_status("Select a watch first");
+            }
         }
         KeyCode::Char('o') | KeyCode::Enter => {
             // Open folder in file manager
@@ -680,5 +718,73 @@ fn handle_numeric_input(text: &mut String, key: KeyEvent) {
             text.clear();
         }
         _ => {}
+    }
+}
+
+fn handle_watch_editor_key(state: &mut AppState, key: KeyEvent) {
+    let Some(ref mut editor) = state.watch_editor else {
+        state.mode = Mode::Normal;
+        return;
+    };
+
+    match key.code {
+        KeyCode::Esc => {
+            // Cancel editing
+            state.watch_editor = None;
+            state.mode = Mode::Normal;
+            state.set_status("Cancelled");
+        }
+        KeyCode::Tab => {
+            // Move to next field
+            editor.field = editor.field.next();
+        }
+        KeyCode::BackTab => {
+            // Move to previous field
+            editor.field = editor.field.prev();
+        }
+        KeyCode::Enter => {
+            // Save the watch
+            if editor.path.trim().is_empty() {
+                state.set_status("Path is required");
+                return;
+            }
+
+            let watch = editor.to_watch();
+            let watch_path = watch.path.display().to_string();
+
+            if let Some(idx) = editor.editing_index {
+                // Update existing watch
+                if idx < state.config.watches.len() {
+                    state.config.watches[idx] = watch;
+                    state.set_status(format!("Updated watch '{}'", watch_path));
+                }
+            } else {
+                // Add new watch
+                state.config.watches.push(watch);
+                state.selected_watch = Some(state.config.watches.len() - 1);
+                state.set_status(format!("Added watch '{}'", watch_path));
+            }
+
+            // Save to config file
+            save_config(state);
+
+            state.watch_editor = None;
+            state.mode = Mode::Normal;
+        }
+        // Handle field-specific input
+        _ => {
+            handle_watch_editor_field_input(editor, key);
+        }
+    }
+}
+
+fn handle_watch_editor_field_input(editor: &mut WatchEditorState, key: KeyEvent) {
+    match editor.field {
+        WatchEditorField::Path => handle_text_input(&mut editor.path, key),
+        WatchEditorField::Recursive => {
+            if matches!(key.code, KeyCode::Char(' ') | KeyCode::Left | KeyCode::Right) {
+                editor.recursive = !editor.recursive;
+            }
+        }
     }
 }

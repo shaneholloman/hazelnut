@@ -263,6 +263,21 @@ type = "trash"
 
 See [docs/configuration.md](docs/configuration.md) for the complete reference.
 
+### Watch Editor (TUI)
+
+You can manage watch folders directly in the TUI:
+
+1. **Add a new watch**: Press `a` or `n` in the Watches view
+2. **Edit an existing watch**: Select a watch and press `e`
+3. **Delete a watch**: Select a watch and press `d`
+
+The watch editor dialog allows you to configure:
+
+- **Path** - Full path to the folder to watch (use absolute paths, `~` is not expanded)
+- **Recursive** - Whether to include subdirectories
+
+Use `Tab` to move between fields, `Enter` to save, and `Esc` to cancel.
+
 <br>
 
 ## 📋 Rules
@@ -555,8 +570,9 @@ args = ["{path}", "-quality", "80", "{path}"]
 
 | Key | Action |
 |-----|--------|
-| `a` | Add watch folder (coming soon) |
-| `d` / `Delete` | Remove watch (coming soon) |
+| `a` / `n` | Add new watch folder |
+| `e` | Edit selected watch |
+| `d` / `Delete` | Delete selected watch |
 | `o` / `Enter` | Open folder |
 
 ### Log View

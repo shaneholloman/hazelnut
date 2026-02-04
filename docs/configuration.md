@@ -136,18 +136,28 @@ theme = "dracula"  # Options below
 
 Watch folders define which directories Hazelnut monitors for changes.
 
+> 💡 **TUI Tip**: You can manage watches directly in the TUI! Press `a` or `n` to add, `e` to edit, `d` to delete.
+
 ```toml
 [[watch]]
-path = "~/Downloads"
+path = "/home/user/Downloads"  # Use full paths, ~ is not expanded
 recursive = false
 rules = []
 ```
 
 | Field | Type | Default | Required | Description |
 |-------|------|---------|----------|-------------|
-| `path` | string | — | ✅ | Directory to watch. Supports `~` for home directory |
+| `path` | string | — | ✅ | Directory to watch (use full paths) |
 | `recursive` | bool | `false` | ❌ | Also watch subdirectories |
 | `rules` | array | `[]` | ❌ | Rule names to apply. Empty = all rules |
+
+### Managing Watches in the TUI
+
+| Key | Action |
+|-----|--------|
+| `a` / `n` | Add new watch folder |
+| `e` | Edit selected watch |
+| `d` | Delete selected watch |
 
 ### Examples
 

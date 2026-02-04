@@ -21,6 +21,10 @@ pub enum Mode {
     EditRule,
     /// Adding a new rule
     AddRule,
+    /// Editing an existing watch
+    EditWatch,
+    /// Adding a new watch
+    AddWatch,
     /// About dialog
     About,
 }
@@ -128,6 +132,9 @@ pub struct AppState {
 
     /// Rule editor state
     pub rule_editor: Option<RuleEditorState>,
+
+    /// Watch editor state
+    pub watch_editor: Option<WatchEditorState>,
 }
 
 /// Available views in the TUI
@@ -190,6 +197,7 @@ impl AppState {
             settings_index: 0,
             daemon_running: false,
             rule_editor: None,
+            watch_editor: None,
         };
 
         // Add welcome log entries
@@ -400,6 +408,77 @@ impl ActionTypeSelection {
             Self::Run => Self::Delete,
             Self::Archive => Self::Run,
             Self::Nothing => Self::Archive,
+        }
+    }
+}
+
+/// Fields in the watch editor dialog
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WatchEditorField {
+    #[default]
+    Path,
+    Recursive,
+}
+
+impl WatchEditorField {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Path => Self::Recursive,
+            Self::Recursive => Self::Path,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            Self::Path => Self::Recursive,
+            Self::Recursive => Self::Path,
+        }
+    }
+}
+
+/// State for the watch editor dialog
+#[derive(Debug, Clone, Default)]
+pub struct WatchEditorState {
+    /// Currently focused field
+    pub field: WatchEditorField,
+
+    /// Watch index being edited (None if adding new)
+    pub editing_index: Option<usize>,
+
+    /// Path to watch
+    pub path: String,
+
+    /// Watch recursively
+    pub recursive: bool,
+}
+
+impl WatchEditorState {
+    /// Create a new watch editor for adding
+    pub fn new_watch() -> Self {
+        Self {
+            field: WatchEditorField::Path,
+            editing_index: None,
+            path: String::new(),
+            recursive: false,
+        }
+    }
+
+    /// Create editor state from an existing watch
+    pub fn from_watch(index: usize, watch: &crate::config::WatchConfig) -> Self {
+        Self {
+            field: WatchEditorField::Path,
+            editing_index: Some(index),
+            path: watch.path.display().to_string(),
+            recursive: watch.recursive,
+        }
+    }
+
+    /// Build a WatchConfig from the editor state
+    pub fn to_watch(&self) -> crate::config::WatchConfig {
+        crate::config::WatchConfig {
+            path: std::path::PathBuf::from(&self.path),
+            recursive: self.recursive,
+            rules: Vec::new(), // TODO: Add rule filter support
         }
     }
 }

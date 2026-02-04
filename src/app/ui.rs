@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
 
-use super::state::{AppState, LogLevel, Mode, RuleEditorField, SettingsItem, View};
+use super::state::{AppState, LogLevel, Mode, RuleEditorField, SettingsItem, View, WatchEditorField};
 use crate::config::Config;
 use crate::theme::Theme;
 
@@ -65,6 +65,11 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     // Render rule editor if active
     if matches!(state.mode, Mode::EditRule | Mode::AddRule) {
         render_rule_editor(frame, state);
+    }
+
+    // Render watch editor if active
+    if matches!(state.mode, Mode::EditWatch | Mode::AddWatch) {
+        render_watch_editor(frame, state);
     }
 
     // Render about dialog if active
@@ -555,7 +560,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
 
     // Calculate popup size
     let popup_width = 60u16.min(area.width.saturating_sub(4));
-    let popup_height = 24u16.min(area.height.saturating_sub(4));
+    let popup_height = 32u16.min(area.height.saturating_sub(4));
 
     let popup_area = Rect {
         x: (area.width - popup_width) / 2,
@@ -591,7 +596,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
-            "  Rules",
+            "  Rules View",
             colors.text_primary().add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
@@ -609,6 +614,23 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         Line::from(vec![
             Span::styled("  d                  ", colors.key_hint()),
             Span::styled("Delete selected rule", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Watches View",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  e                  ", colors.key_hint()),
+            Span::styled("Edit selected watch", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  a/n                ", colors.key_hint()),
+            Span::styled("Add new watch", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  d                  ", colors.key_hint()),
+            Span::styled("Delete selected watch", colors.text()),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -1048,6 +1070,98 @@ fn field_help(field: RuleEditorField) -> &'static str {
         ActionDestination => "Target folder path, e.g. ~/Documents/PDFs",
         ActionPattern => "Rename pattern, e.g. '{name}_{date}.{ext}'",
         ActionCommand => "Command to run, e.g. 'convert' or '/usr/bin/script.sh'",
+    }
+}
+
+fn render_watch_editor(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let Some(ref editor) = state.watch_editor else {
+        return;
+    };
+
+    // Calculate popup size - smaller than rule editor
+    let popup_width = 60u16.min(area.width.saturating_sub(4));
+    let popup_height = 12u16.min(area.height.saturating_sub(4));
+
+    let popup_area = Rect {
+        x: (area.width - popup_width) / 2,
+        y: (area.height - popup_height) / 2,
+        width: popup_width,
+        height: popup_height,
+    };
+
+    // Clear the area
+    frame.render_widget(Clear, popup_area);
+
+    // Helper to render a field
+    let field_style = |f: WatchEditorField| {
+        if editor.field == f {
+            colors.selected().add_modifier(Modifier::BOLD)
+        } else {
+            colors.text()
+        }
+    };
+
+    let label_style = |f: WatchEditorField| {
+        if editor.field == f {
+            colors.text_primary()
+        } else {
+            colors.text_dim()
+        }
+    };
+
+    let cursor = |f: WatchEditorField| if editor.field == f { "▸" } else { " " };
+
+    let title = if state.mode == Mode::EditWatch {
+        format!(" ✏ Edit Watch ")
+    } else {
+        " ✚ New Watch ".to_string()
+    };
+
+    let content = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(format!(" {} ", cursor(WatchEditorField::Path)), field_style(WatchEditorField::Path)),
+            Span::styled("Path:      ", label_style(WatchEditorField::Path)),
+            Span::styled(if editor.path.is_empty() { "(enter path)" } else { &editor.path }, field_style(WatchEditorField::Path)),
+            Span::styled(if editor.field == WatchEditorField::Path { "▏" } else { "" }, colors.text_primary()),
+        ]),
+        Line::from(vec![
+            Span::styled(format!(" {} ", cursor(WatchEditorField::Recursive)), field_style(WatchEditorField::Recursive)),
+            Span::styled("Recursive: ", label_style(WatchEditorField::Recursive)),
+            Span::styled(if editor.recursive { "✓ Yes" } else { "✗ No" }, field_style(WatchEditorField::Recursive)),
+        ]),
+        Line::from(""),
+        // Contextual help line
+        Line::from(vec![
+            Span::styled("  💡 ", colors.text_dim()),
+            Span::styled(watch_field_help(editor.field), colors.text_muted().add_modifier(Modifier::ITALIC)),
+        ]),
+    ];
+
+    let editor_widget = Paragraph::new(content)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.primary))
+                .border_type(BorderType::Rounded)
+                .style(Style::default().bg(colors.bg))
+                .title(title)
+                .title_style(colors.text_primary())
+                .title_bottom(Line::from(" Tab: next field │ Enter: save │ Esc: cancel ").centered()),
+        )
+        .wrap(Wrap { trim: false });
+
+    frame.render_widget(editor_widget, popup_area);
+}
+
+/// Returns contextual help text for each watch editor field
+fn watch_field_help(field: WatchEditorField) -> &'static str {
+    match field {
+        WatchEditorField::Path => "Full path to watch, e.g. /home/user/Downloads (~ not expanded)",
+        WatchEditorField::Recursive => "Space/←→ to toggle — watch subdirectories too",
     }
 }
 
