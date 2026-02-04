@@ -225,7 +225,26 @@ fn handle_rules_key(state: &mut AppState, key: KeyEvent) {
             }
         }
         KeyCode::Char('d') | KeyCode::Delete => {
-            state.set_status("Delete not implemented yet (use config file)");
+            // Delete selected rule
+            if let Some(idx) = state.selected_rule {
+                if idx < state.config.rules.len() {
+                    let rule_name = state.config.rules[idx].name.clone();
+                    state.config.rules.remove(idx);
+                    
+                    // Update selection
+                    if state.config.rules.is_empty() {
+                        state.selected_rule = None;
+                    } else if idx >= state.config.rules.len() {
+                        state.selected_rule = Some(state.config.rules.len() - 1);
+                    }
+                    
+                    // Save config
+                    save_config(state);
+                    state.set_status(format!("Deleted rule '{}'", rule_name));
+                }
+            } else {
+                state.set_status("Select a rule first");
+            }
         }
         _ => {}
     }

@@ -184,6 +184,19 @@ Rules are the core of Hazelnut. Each rule consists of:
 2. **Condition** - What files to match
 3. **Action** - What to do with matched files
 
+### Creating Rules in the TUI
+
+You can manage rules directly in the terminal interface:
+
+| Key | Action |
+|-----|--------|
+| `n` | Create a new rule |
+| `e` | Edit the selected rule |
+| `d` | Delete the selected rule |
+| `Enter` / `Space` | Toggle rule enabled/disabled |
+
+The rule editor dialog allows you to configure all rule properties including conditions and actions. Changes are saved automatically to your config file.
+
 ### Rule Structure
 
 ```toml

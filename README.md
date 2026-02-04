@@ -389,6 +389,23 @@ destination = "~/Archives"
 delete_original = false
 ```
 
+### Rule Editor (TUI)
+
+You can create and edit rules directly in the TUI without editing the config file:
+
+1. **Create a new rule**: Press `n` in the Rules view
+2. **Edit an existing rule**: Select a rule and press `e`
+3. **Delete a rule**: Select a rule and press `d`
+
+The rule editor dialog allows you to configure:
+
+- **Name** - A descriptive name for your rule
+- **Enabled** - Toggle the rule on/off
+- **Conditions** - Extension, name patterns (glob/regex), size limits, age limits, is_directory, is_hidden
+- **Action** - Move, Copy, Rename, Trash, Delete, Run Command, or Archive
+
+Use `Tab` to move between fields, `Enter` to save, and `Esc` to cancel.
+
 ### Example Rules
 
 <details>
@@ -517,9 +534,9 @@ args = ["{path}", "-quality", "80", "{path}"]
 | Key | Action |
 |-----|--------|
 | `Enter` / `Space` | Toggle rule enabled/disabled |
-| `e` | Edit rule (coming soon) |
-| `n` | New rule (coming soon) |
-| `d` / `Delete` | Delete rule (coming soon) |
+| `e` | Edit selected rule |
+| `n` | Create new rule |
+| `d` / `Delete` | Delete selected rule |
 
 ### Watches View
 

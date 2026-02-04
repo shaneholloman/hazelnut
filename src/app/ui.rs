@@ -555,7 +555,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
 
     // Calculate popup size
     let popup_width = 60u16.min(area.width.saturating_sub(4));
-    let popup_height = 22u16.min(area.height.saturating_sub(4));
+    let popup_height = 24u16.min(area.height.saturating_sub(4));
 
     let popup_area = Rect {
         x: (area.width - popup_width) / 2,
@@ -605,6 +605,10 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         Line::from(vec![
             Span::styled("  n                  ", colors.key_hint()),
             Span::styled("Create new rule", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  d                  ", colors.key_hint()),
+            Span::styled("Delete selected rule", colors.text()),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
