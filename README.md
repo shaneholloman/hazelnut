@@ -694,8 +694,57 @@ hazelnutd start      # Start daemon (background)
 hazelnutd stop       # Stop daemon
 hazelnutd restart    # Restart daemon
 hazelnutd status     # Show daemon status
-hazelnutd reload     # Reload configuration
+hazelnutd reload     # Reload configuration (hot-reload, no restart)
 hazelnutd run        # Run in foreground (for debugging)
+```
+
+#### Daemon Commands
+
+| Command | Description |
+|---------|-------------|
+| `start` | Start daemon in background, detached from terminal |
+| `stop` | Gracefully stop the daemon (SIGTERM) |
+| `restart` | Stop and start the daemon |
+| `status` | Show running state, PID, uptime, and log location |
+| `reload` | Hot-reload config via SIGHUP (no restart needed) |
+| `run` | Run in foreground with live logging (for debugging) |
+
+#### Status Output
+
+```bash
+$ hazelnutd status
+🌰 Hazelnut daemon is running
+   PID: 12345
+   PID file: /run/user/1000/hazelnutd.pid
+   Log file: ~/.local/state/hazelnut/hazelnutd.log
+   Uptime: 2h 15m 30s
+```
+
+#### File Locations
+
+| File | Path | Purpose |
+|------|------|---------|
+| PID file | `$XDG_RUNTIME_DIR/hazelnutd.pid` | Tracks running daemon |
+| Log file | `~/.local/state/hazelnut/hazelnutd.log` | Daemon activity log |
+| Config | `~/.config/hazelnut/config.toml` | Rules and settings |
+
+#### Typical Workflow
+
+```bash
+# 1. Edit your rules in the TUI or config file
+hazelnut
+
+# 2. Start the daemon
+hazelnutd start
+
+# 3. Check it's running
+hazelnutd status
+
+# 4. After editing rules, reload without restart
+hazelnutd reload
+
+# 5. View logs if needed
+tail -f ~/.local/state/hazelnut/hazelnutd.log
 ```
 
 <br>

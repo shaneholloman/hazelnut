@@ -769,6 +769,102 @@ log_level = "debug"
 
 ---
 
+## Daemon Management
+
+The `hazelnutd` daemon runs in the background and processes file events 24/7.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `hazelnutd start` | Start daemon in background, detached from terminal |
+| `hazelnutd stop` | Gracefully stop the daemon |
+| `hazelnutd restart` | Stop and start the daemon |
+| `hazelnutd status` | Show running state, PID, uptime, and log location |
+| `hazelnutd reload` | Hot-reload configuration without restarting |
+| `hazelnutd run` | Run in foreground with live logging (for debugging) |
+
+### File Locations
+
+| File | Default Path | Purpose |
+|------|--------------|---------|
+| PID file | `$XDG_RUNTIME_DIR/hazelnutd.pid` | Tracks running daemon process |
+| Log file | `~/.local/state/hazelnut/hazelnutd.log` | Daemon activity and error log |
+| Config | `~/.config/hazelnut/config.toml` | Rules and watch configuration |
+
+### Usage Examples
+
+```bash
+# Start daemon
+hazelnutd start
+# Output: 🌰 Starting hazelnut daemon...
+#         ✓ Daemon started (PID: 12345)
+#           Log file: ~/.local/state/hazelnut/hazelnutd.log
+
+# Check status
+hazelnutd status
+# Output: 🌰 Hazelnut daemon is running
+#            PID: 12345
+#            PID file: /run/user/1000/hazelnutd.pid
+#            Log file: ~/.local/state/hazelnut/hazelnutd.log
+#            Uptime: 2h 15m 30s
+
+# Reload after editing config (no restart needed!)
+hazelnutd reload
+# Output: 🌰 Reloading configuration (PID: 12345)...
+#         ✓ Reload signal sent
+
+# View live logs
+tail -f ~/.local/state/hazelnut/hazelnutd.log
+
+# Stop daemon
+hazelnutd stop
+# Output: 🌰 Stopping daemon (PID: 12345)...
+#         ✓ Daemon stopped
+```
+
+### Signals
+
+The daemon responds to Unix signals:
+
+| Signal | Action |
+|--------|--------|
+| `SIGTERM` | Graceful shutdown |
+| `SIGINT` | Graceful shutdown (Ctrl+C in foreground mode) |
+| `SIGHUP` | Reload configuration |
+
+### Running at Startup
+
+To run Hazelnut automatically on login, create a systemd user service:
+
+```bash
+# Create service file
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/hazelnutd.service << 'EOF'
+[Unit]
+Description=Hazelnut File Organizer Daemon
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/hazelnutd run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Enable and start
+systemctl --user enable hazelnutd
+systemctl --user start hazelnutd
+
+# Check status
+systemctl --user status hazelnutd
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Description |
