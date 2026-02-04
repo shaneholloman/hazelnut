@@ -450,6 +450,9 @@ pub struct WatchEditorState {
 
     /// Watch recursively
     pub recursive: bool,
+
+    /// Rule filter (preserved but not editable in TUI yet)
+    pub rules_filter: Vec<String>,
 }
 
 impl WatchEditorState {
@@ -460,6 +463,7 @@ impl WatchEditorState {
             editing_index: None,
             path: String::new(),
             recursive: false,
+            rules_filter: Vec::new(),
         }
     }
 
@@ -470,6 +474,7 @@ impl WatchEditorState {
             editing_index: Some(index),
             path: watch.path.display().to_string(),
             recursive: watch.recursive,
+            rules_filter: watch.rules.clone(),
         }
     }
 
@@ -478,7 +483,7 @@ impl WatchEditorState {
         crate::config::WatchConfig {
             path: std::path::PathBuf::from(&self.path),
             recursive: self.recursive,
-            rules: Vec::new(), // TODO: Add rule filter support
+            rules: self.rules_filter.clone(),
         }
     }
 }
@@ -495,6 +500,7 @@ pub struct RuleEditorState {
     // Basic fields
     pub name: String,
     pub enabled: bool,
+    pub stop_processing: bool,
 
     // Condition fields
     pub extension: String,
@@ -609,6 +615,7 @@ impl RuleEditorState {
             editing_index: Some(index),
             name: rule.name.clone(),
             enabled: rule.enabled,
+            stop_processing: rule.stop_processing,
             extension: rule.condition.extension.clone().unwrap_or_default(),
             name_glob: rule.condition.name_matches.clone().unwrap_or_default(),
             name_regex: rule.condition.name_regex.clone().unwrap_or_default(),
@@ -679,7 +686,7 @@ impl RuleEditorState {
             enabled: self.enabled,
             condition,
             action,
-            stop_processing: false,
+            stop_processing: self.stop_processing,
         }
     }
 }
