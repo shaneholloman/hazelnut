@@ -12,6 +12,7 @@ categories = ["command-line-utilities", "filesystem"]
 default-run = "hazelnut"
 
 [dependencies]
+libc = "0.2"
 # TUI
 ratatui = "0.30"
 crossterm = "0.29"

@@ -688,6 +688,7 @@ dependencies = [
  "crossterm",
  "dirs",
  "glob",
+ "libc",
  "notify",
  "open",
  "predicates",
