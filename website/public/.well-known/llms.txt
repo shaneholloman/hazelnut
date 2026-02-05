@@ -11,7 +11,7 @@ Hazelnut is a Rust-based terminal application for automated file organization. W
 - **License:** MIT
 - **Platforms:** macOS, Linux (daemon is Unix-only; TUI works on Windows)
 - **Repository:** https://github.com/ricardodantas/hazelnut
-- **Documentation:** https://hazelnut.dev/docs
+- **Documentation:** https://hazelnut.ricardodantas.me/docs
 - **Author:** Ricardo Dantas
 - **Inspired by:** Hazel (macOS app)
 
@@ -131,8 +131,8 @@ type = "trash"
 
 ## Links
 
-- Website: https://hazelnut.dev
+- Website: https://hazelnut.ricardodantas.me
 - GitHub: https://github.com/ricardodantas/hazelnut
 - Issues: https://github.com/ricardodantas/hazelnut/issues
-- Themes: https://hazelnut.dev/themes
-- Documentation: https://hazelnut.dev/docs
+- Themes: https://hazelnut.ricardodantas.me/themes
+- Documentation: https://hazelnut.ricardodantas.me/docs
