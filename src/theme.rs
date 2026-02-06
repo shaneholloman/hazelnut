@@ -58,6 +58,12 @@ impl Theme {
     pub fn inner(&self) -> ThemeName {
         self.0
     }
+
+    /// Get the kebab-case slug for config files
+    #[must_use]
+    pub fn slug(&self) -> &'static str {
+        self.0.slug()
+    }
 }
 
 impl From<ThemeName> for Theme {

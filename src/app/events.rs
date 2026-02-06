@@ -165,9 +165,13 @@ fn handle_theme_picker_key(state: &mut AppState, key: KeyEvent) {
             // Apply selected theme
             let selected_theme = Theme::from(themes[state.theme_picker_index]);
             state.theme = selected_theme;
+            
+            // Save to config
+            state.config.general.theme = Some(selected_theme.inner().slug().to_string());
+            save_config(state);
+            
             state.mode = Mode::Normal;
             state.set_status(format!("Theme set to {}", selected_theme.name()));
-            // TODO: Save to config file
         }
         KeyCode::Down | KeyCode::Char('j') => {
             state.theme_picker_index = (state.theme_picker_index + 1) % len;

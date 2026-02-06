@@ -26,8 +26,14 @@ pub async fn run(config_path: Option<PathBuf>) -> Result<()> {
     // Load config
     let config = Config::load(config_path.as_deref())?;
 
-    // Load theme
-    let theme = Theme::load()?;
+    // Load theme from config or use default
+    let theme: Theme = config
+        .general
+        .theme
+        .as_ref()
+        .and_then(|name| name.parse::<ratatui_themes::ThemeName>().ok())
+        .map(Theme::from)
+        .unwrap_or_default();
 
     // Initialize terminal
     enable_raw_mode()?;
