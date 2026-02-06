@@ -343,6 +343,9 @@ mod unix_daemon {
         let config_path_clone = config_path.clone();
         let mut config = hazelnut::Config::load(config_path.as_deref())?;
 
+        // Initialize notifications
+        hazelnut::notifications::init(config.general.notifications_enabled);
+
         info!(
             "Loaded config with {} watch paths and {} rules",
             config.watches.len(),
@@ -359,7 +362,13 @@ mod unix_daemon {
         for watch in &config.watches {
             let expanded_path = hazelnut::expand_path(&watch.path);
             info!("Watching: {}", expanded_path.display());
-            watcher.watch(&expanded_path, watch.recursive)?;
+            if let Err(e) = watcher.watch(&expanded_path, watch.recursive) {
+                tracing::error!("Failed to watch {}: {}", expanded_path.display(), e);
+                hazelnut::notifications::notify_watch_error(
+                    &expanded_path.display().to_string(),
+                    &e.to_string(),
+                );
+            }
         }
 
         info!("Daemon running (PID: {})", std::process::id());
@@ -382,6 +391,8 @@ mod unix_daemon {
                     match hazelnut::Config::load(config_path_clone.as_deref()) {
                         Ok(new_config) => {
                             config = new_config;
+                            // Update notification settings
+                            hazelnut::notifications::init(config.general.notifications_enabled);
                             // Recreate watcher with new rules, polling interval, and debounce
                             let engine = hazelnut::RuleEngine::new(config.rules.clone());
                             match hazelnut::Watcher::new(
@@ -394,6 +405,10 @@ mod unix_daemon {
                                         let expanded_path = hazelnut::expand_path(&watch.path);
                                         if let Err(e) = new_watcher.watch(&expanded_path, watch.recursive) {
                                             tracing::error!("Failed to watch {}: {}", expanded_path.display(), e);
+                                            hazelnut::notifications::notify_watch_error(
+                                                &expanded_path.display().to_string(),
+                                                &e.to_string(),
+                                            );
                                         }
                                     }
                                     watcher = new_watcher;

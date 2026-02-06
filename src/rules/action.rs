@@ -197,6 +197,8 @@ impl Action {
                         })?;
 
                     if !status.success() {
+                        let err_msg = format!("exited with status {}", status);
+                        crate::notifications::notify_command_error(&expanded_command, &err_msg);
                         anyhow::bail!("Command failed with status: {}", status);
                     }
                 } else {
@@ -225,6 +227,8 @@ impl Action {
                         .with_context(|| format!("Failed to run command: {}", actual_command))?;
 
                     if !status.success() {
+                        let err_msg = format!("exited with status {}", status);
+                        crate::notifications::notify_command_error(actual_command, &err_msg);
                         anyhow::bail!("Command failed with status: {}", status);
                     }
                 }

@@ -100,8 +100,24 @@ impl Watcher {
                     for path in paths_to_process {
                         if path.is_file() && path.exists() {
                             info!("File event detected: {}", path.display());
-                            if self.engine.process(&path)? {
-                                processed += 1;
+                            match self.engine.process(&path) {
+                                Ok(true) => processed += 1,
+                                Ok(false) => {} // No matching rule
+                                Err(e) => {
+                                    error!("Rule processing failed for {}: {}", path.display(), e);
+                                    // Find which rule matched (if any) for the notification
+                                    let rule_name = self
+                                        .engine
+                                        .evaluate(&path)
+                                        .ok()
+                                        .flatten()
+                                        .map(|_| self.find_matching_rule_name(&path))
+                                        .unwrap_or_else(|| "unknown".to_string());
+                                    crate::notifications::notify_rule_error(
+                                        &rule_name,
+                                        &e.to_string(),
+                                    );
+                                }
                             }
                         }
                     }
@@ -116,6 +132,16 @@ impl Watcher {
         self.event_handler.cleanup();
 
         Ok(processed)
+    }
+
+    /// Find the name of the first matching rule for a path
+    fn find_matching_rule_name(&self, path: &std::path::Path) -> String {
+        for rule in self.engine.rules() {
+            if rule.enabled && rule.condition.matches(path).unwrap_or(false) {
+                return rule.name.clone();
+            }
+        }
+        "unknown".to_string()
     }
 
     /// Get the rule engine

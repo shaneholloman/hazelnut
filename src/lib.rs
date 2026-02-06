@@ -7,6 +7,7 @@ pub mod app;
 pub mod autostart;
 pub mod config;
 pub mod ipc;
+pub mod notifications;
 pub mod rules;
 pub mod theme;
 pub mod watcher;
