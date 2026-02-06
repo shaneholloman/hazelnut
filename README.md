@@ -190,7 +190,7 @@ hazelnutd start
 
 ## ⚙️ Configuration
 
-Hazelnut uses [TOML](https://toml.io) for configuration. The default location is:
+Hazelnut uses [TOML](https://toml.io) for configuration. The config file is always located at:
 
 ```
 ~/.config/hazelnut/config.toml
@@ -799,9 +799,6 @@ cargo run
 
 # Run daemon in foreground
 cargo run --bin hazelnutd run
-
-# Run with sample config
-cargo run -- --config examples/config.toml
 
 # Run tests
 cargo test

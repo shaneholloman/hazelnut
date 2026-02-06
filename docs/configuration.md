@@ -6,20 +6,15 @@ Hazelnut uses [TOML](https://toml.io) for configuration. This document provides 
 
 ## Config File Location
 
-The default configuration file location is:
+The configuration file is always located at:
 
 ```
 ~/.config/hazelnut/config.toml
 ```
 
-You can specify a different config file with the `--config` flag:
+The TUI (`hazelnut`) and daemon (`hazelnutd`) automatically use this default path.
 
-```bash
-hazelnut --config /path/to/config.toml
-hazelnutd --config /path/to/config.toml run
-```
-
-> 💡 **Note**: Use full paths in config files (e.g., `/home/user/Downloads`). The `~` shortcut is not expanded by the daemon.
+> 💡 **Note**: Use full paths in config files (e.g., `/home/user/Downloads`). The `~` shortcut is expanded automatically.
 
 ## Complete Example
 
@@ -870,9 +865,7 @@ systemctl --user status hazelnutd
 | Variable | Description |
 |----------|-------------|
 | `HAZELNUT_LOG` | Set log level (overrides config) |
-| `HAZELNUT_CONFIG` | Default config file path |
 
 ```bash
 HAZELNUT_LOG=debug hazelnut
-HAZELNUT_CONFIG=/custom/path/config.toml hazelnutd run
 ```
