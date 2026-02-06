@@ -8,10 +8,14 @@ use std::path::PathBuf;
 /// Check if the daemon is currently running by checking the PID file
 #[cfg(unix)]
 fn is_daemon_running() -> bool {
-    let pid_file = dirs::runtime_dir()
-        .or_else(dirs::state_dir)
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("hazelnutd.pid");
+    let pid_file = dirs::home_dir()
+        .map(|h| {
+            h.join(".local")
+                .join("state")
+                .join("hazelnut")
+                .join("hazelnutd.pid")
+        })
+        .unwrap_or_else(|| PathBuf::from("/tmp/hazelnutd.pid"));
 
     if let Ok(pid_str) = std::fs::read_to_string(&pid_file)
         && let Ok(pid) = pid_str.trim().parse::<i32>()
