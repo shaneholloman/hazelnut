@@ -52,8 +52,9 @@ impl Config {
     }
 
     /// Get the default config file path
+    /// Always uses ~/.config/hazelnut/config.toml for consistency across platforms
     pub fn default_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|d| d.join("hazelnut").join("config.toml"))
+        dirs::home_dir().map(|d| d.join(".config").join("hazelnut").join("config.toml"))
     }
 
     /// Get the default data directory
