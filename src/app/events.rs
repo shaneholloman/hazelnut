@@ -495,16 +495,6 @@ fn handle_settings_action(state: &mut AppState) {
                 .unwrap_or(0);
             state.mode = Mode::ThemePicker;
         }
-        SettingsItem::ConfigLocation => {
-            // Show config path (read-only, just display it)
-            let path = state
-                .config_path
-                .as_ref()
-                .map(|p| p.display().to_string())
-                .or_else(|| crate::config::Config::default_path().map(|p| p.display().to_string()))
-                .unwrap_or_else(|| "Not set".to_string());
-            state.set_status(format!("Config: {}", path));
-        }
         SettingsItem::PollingInterval => {
             // Cycle through common values: 1, 2, 5, 10, 30, 60
             let current = state.config.general.polling_interval_secs;
@@ -656,7 +646,8 @@ fn toggle_daemon(state: &mut AppState) {
 }
 
 fn save_config(state: &mut AppState) {
-    if let Err(e) = state.config.save(state.config_path.as_deref()) {
+    // Always save to default path (~/.config/hazelnut/config.toml)
+    if let Err(e) = state.config.save(None) {
         state.set_status(format!("Failed to save config: {}", e));
     }
 }

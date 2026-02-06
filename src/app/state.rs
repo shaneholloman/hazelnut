@@ -60,7 +60,6 @@ pub enum Mode {
 pub enum SettingsItem {
     DaemonControl,
     ThemeSelection,
-    ConfigLocation,
     PollingInterval,
     LogRetention,
     StartupBehavior,
@@ -72,7 +71,6 @@ impl SettingsItem {
         &[
             SettingsItem::DaemonControl,
             SettingsItem::ThemeSelection,
-            SettingsItem::ConfigLocation,
             SettingsItem::PollingInterval,
             SettingsItem::LogRetention,
             SettingsItem::StartupBehavior,
@@ -84,7 +82,6 @@ impl SettingsItem {
         match self {
             SettingsItem::DaemonControl => "Start/Stop Daemon",
             SettingsItem::ThemeSelection => "Theme",
-            SettingsItem::ConfigLocation => "Config File",
             SettingsItem::PollingInterval => "Polling Interval",
             SettingsItem::LogRetention => "Log Retention",
             SettingsItem::StartupBehavior => "Start Daemon on Launch",
@@ -96,7 +93,6 @@ impl SettingsItem {
         match self {
             SettingsItem::DaemonControl => "🔌",
             SettingsItem::ThemeSelection => "🎨",
-            SettingsItem::ConfigLocation => "📁",
             SettingsItem::PollingInterval => "⏱",
             SettingsItem::LogRetention => "📋",
             SettingsItem::StartupBehavior => "🚀",
@@ -116,9 +112,6 @@ pub struct AppState {
 
     /// Loaded configuration
     pub config: Config,
-
-    /// Path to config file (if specified)
-    pub config_path: Option<PathBuf>,
 
     /// Current theme
     pub theme: Theme,
@@ -206,11 +199,6 @@ pub enum LogLevel {
 impl AppState {
     /// Create a new application state from config
     pub fn new(config: Config, theme: Theme) -> Self {
-        Self::with_config_path(config, theme, None)
-    }
-
-    /// Create a new application state from config with a specific config path
-    pub fn with_config_path(config: Config, theme: Theme, config_path: Option<PathBuf>) -> Self {
         // Find current theme index
         let theme_picker_index = Theme::all()
             .iter()
@@ -221,7 +209,6 @@ impl AppState {
             view: View::default(),
             mode: Mode::default(),
             config,
-            config_path,
             theme,
             selected_rule: None,
             selected_watch: None,

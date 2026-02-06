@@ -11,7 +11,6 @@ use ratatui::{
 use super::state::{
     AppState, LogLevel, Mode, RuleEditorField, SettingsItem, View, WatchEditorField,
 };
-use crate::config::Config;
 use crate::theme::Theme;
 
 /// ASCII art logo for Hazelnut
@@ -915,31 +914,6 @@ fn get_settings_value_display(state: &AppState, item: SettingsItem) -> String {
             }
         }
         SettingsItem::ThemeSelection => state.theme.name().to_string(),
-        SettingsItem::ConfigLocation => {
-            state
-                .config_path
-                .as_ref()
-                .map(|p| {
-                    // Shorten path for display
-                    let s = p.display().to_string();
-                    if s.len() > 25 {
-                        format!("...{}", &s[s.len() - 22..])
-                    } else {
-                        s
-                    }
-                })
-                .or_else(|| {
-                    Config::default_path().map(|p| {
-                        let s = p.display().to_string();
-                        if s.len() > 25 {
-                            format!("...{}", &s[s.len() - 22..])
-                        } else {
-                            s
-                        }
-                    })
-                })
-                .unwrap_or_else(|| "Not set".to_string())
-        }
         SettingsItem::PollingInterval => {
             format!("{}s", state.config.general.polling_interval_secs)
         }
