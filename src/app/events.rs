@@ -723,7 +723,7 @@ fn handle_rule_editor_key(state: &mut AppState, key: KeyEvent) {
 
 fn handle_rule_editor_field_input(editor: &mut RuleEditorState, key: KeyEvent) {
     match editor.field {
-        RuleEditorField::Name => handle_text_input(&mut editor.name, key),
+        RuleEditorField::Name => handle_text_input(&mut editor.name, &mut editor.cursor_name, key),
         RuleEditorField::Enabled => {
             if matches!(
                 key.code,
@@ -732,13 +732,13 @@ fn handle_rule_editor_field_input(editor: &mut RuleEditorState, key: KeyEvent) {
                 editor.enabled = !editor.enabled;
             }
         }
-        RuleEditorField::Extension => handle_text_input(&mut editor.extension, key),
-        RuleEditorField::NameGlob => handle_text_input(&mut editor.name_glob, key),
-        RuleEditorField::NameRegex => handle_text_input(&mut editor.name_regex, key),
-        RuleEditorField::SizeGreater => handle_numeric_input(&mut editor.size_greater, key),
-        RuleEditorField::SizeLess => handle_numeric_input(&mut editor.size_less, key),
-        RuleEditorField::AgeGreater => handle_numeric_input(&mut editor.age_greater, key),
-        RuleEditorField::AgeLess => handle_numeric_input(&mut editor.age_less, key),
+        RuleEditorField::Extension => handle_text_input(&mut editor.extension, &mut editor.cursor_extension, key),
+        RuleEditorField::NameGlob => handle_text_input(&mut editor.name_glob, &mut editor.cursor_name_glob, key),
+        RuleEditorField::NameRegex => handle_text_input(&mut editor.name_regex, &mut editor.cursor_name_regex, key),
+        RuleEditorField::SizeGreater => handle_numeric_input(&mut editor.size_greater, &mut editor.cursor_size_greater, key),
+        RuleEditorField::SizeLess => handle_numeric_input(&mut editor.size_less, &mut editor.cursor_size_less, key),
+        RuleEditorField::AgeGreater => handle_numeric_input(&mut editor.age_greater, &mut editor.cursor_age_greater, key),
+        RuleEditorField::AgeLess => handle_numeric_input(&mut editor.age_less, &mut editor.cursor_age_less, key),
         RuleEditorField::IsDirectory => {
             if matches!(
                 key.code,
@@ -773,38 +773,82 @@ fn handle_rule_editor_field_input(editor: &mut RuleEditorState, key: KeyEvent) {
             _ => {}
         },
         RuleEditorField::ActionDestination => {
-            handle_text_input(&mut editor.action_destination, key)
+            handle_text_input(&mut editor.action_destination, &mut editor.cursor_action_destination, key)
         }
-        RuleEditorField::ActionPattern => handle_text_input(&mut editor.action_pattern, key),
-        RuleEditorField::ActionCommand => handle_text_input(&mut editor.action_command, key),
+        RuleEditorField::ActionPattern => handle_text_input(&mut editor.action_pattern, &mut editor.cursor_action_pattern, key),
+        RuleEditorField::ActionCommand => handle_text_input(&mut editor.action_command, &mut editor.cursor_action_command, key),
     }
 }
 
-fn handle_text_input(text: &mut String, key: KeyEvent) {
+fn handle_text_input(input: &mut String, cursor: &mut usize, key: KeyEvent) {
     match key.code {
         KeyCode::Char(c) => {
-            text.push(c);
+            input.insert(*cursor, c);
+            *cursor += 1;
         }
         KeyCode::Backspace => {
-            text.pop();
+            if *cursor > 0 {
+                *cursor -= 1;
+                input.remove(*cursor);
+            }
         }
         KeyCode::Delete => {
-            text.clear();
+            if *cursor < input.len() {
+                input.remove(*cursor);
+            }
+        }
+        KeyCode::Left => {
+            if *cursor > 0 {
+                *cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if *cursor < input.len() {
+                *cursor += 1;
+            }
+        }
+        KeyCode::Home => {
+            *cursor = 0;
+        }
+        KeyCode::End => {
+            *cursor = input.len();
         }
         _ => {}
     }
 }
 
-fn handle_numeric_input(text: &mut String, key: KeyEvent) {
+fn handle_numeric_input(input: &mut String, cursor: &mut usize, key: KeyEvent) {
     match key.code {
         KeyCode::Char(c) if c.is_ascii_digit() => {
-            text.push(c);
+            input.insert(*cursor, c);
+            *cursor += 1;
         }
         KeyCode::Backspace => {
-            text.pop();
+            if *cursor > 0 {
+                *cursor -= 1;
+                input.remove(*cursor);
+            }
         }
         KeyCode::Delete => {
-            text.clear();
+            if *cursor < input.len() {
+                input.remove(*cursor);
+            }
+        }
+        KeyCode::Left => {
+            if *cursor > 0 {
+                *cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if *cursor < input.len() {
+                *cursor += 1;
+            }
+        }
+        KeyCode::Home => {
+            *cursor = 0;
+        }
+        KeyCode::End => {
+            *cursor = input.len();
         }
         _ => {}
     }
@@ -869,7 +913,7 @@ fn handle_watch_editor_key(state: &mut AppState, key: KeyEvent) {
 
 fn handle_watch_editor_field_input(editor: &mut WatchEditorState, key: KeyEvent) {
     match editor.field {
-        WatchEditorField::Path => handle_text_input(&mut editor.path, key),
+        WatchEditorField::Path => handle_text_input(&mut editor.path, &mut editor.cursor_path, key),
         WatchEditorField::Recursive => {
             if matches!(
                 key.code,

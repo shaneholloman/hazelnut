@@ -552,6 +552,9 @@ pub struct WatchEditorState {
 
     /// Currently highlighted rule in the rules list
     pub rules_cursor: usize,
+
+    /// Cursor position for path field
+    pub cursor_path: usize,
 }
 
 impl WatchEditorState {
@@ -565,6 +568,7 @@ impl WatchEditorState {
             rules_filter: Vec::new(),
             available_rules,
             rules_cursor: 0,
+            cursor_path: 0,
         }
     }
 
@@ -574,14 +578,17 @@ impl WatchEditorState {
         watch: &crate::config::WatchConfig,
         available_rules: Vec<String>,
     ) -> Self {
+        let path = watch.path.display().to_string();
+        let cursor_path = path.len();
         Self {
             field: WatchEditorField::Path,
             editing_index: Some(index),
-            path: watch.path.display().to_string(),
+            path,
             recursive: watch.recursive,
             rules_filter: watch.rules.clone(),
             available_rules,
             rules_cursor: 0,
+            cursor_path,
         }
     }
 
@@ -642,6 +649,20 @@ pub struct RuleEditorState {
     pub action_args: String,
     pub action_overwrite: bool,
     pub action_delete_original: bool,
+
+    // Cursor positions for text fields
+    pub cursor_name: usize,
+    pub cursor_extension: usize,
+    pub cursor_name_glob: usize,
+    pub cursor_name_regex: usize,
+    pub cursor_size_greater: usize,
+    pub cursor_size_less: usize,
+    pub cursor_age_greater: usize,
+    pub cursor_age_less: usize,
+    pub cursor_action_destination: usize,
+    pub cursor_action_pattern: usize,
+    pub cursor_action_command: usize,
+    pub cursor_action_args: usize,
 }
 
 impl RuleEditorState {
@@ -784,12 +805,25 @@ impl RuleEditorState {
             is_directory: rule.condition.is_directory,
             is_hidden: rule.condition.is_hidden,
             action_type,
-            action_destination,
-            action_pattern,
-            action_command,
-            action_args,
+            action_destination: action_destination.clone(),
+            action_pattern: action_pattern.clone(),
+            action_command: action_command.clone(),
+            action_args: action_args.clone(),
             action_overwrite,
             action_delete_original,
+            // Set cursor positions to end of each field
+            cursor_name: rule.name.len(),
+            cursor_extension: rule.condition.extension.as_ref().map(|s| s.len()).unwrap_or(0),
+            cursor_name_glob: rule.condition.name_matches.as_ref().map(|s| s.len()).unwrap_or(0),
+            cursor_name_regex: rule.condition.name_regex.as_ref().map(|s| s.len()).unwrap_or(0),
+            cursor_size_greater: rule.condition.size_greater_than.map(|v| v.to_string().len()).unwrap_or(0),
+            cursor_size_less: rule.condition.size_less_than.map(|v| v.to_string().len()).unwrap_or(0),
+            cursor_age_greater: rule.condition.age_days_greater_than.map(|v| v.to_string().len()).unwrap_or(0),
+            cursor_age_less: rule.condition.age_days_less_than.map(|v| v.to_string().len()).unwrap_or(0),
+            cursor_action_destination: action_destination.len(),
+            cursor_action_pattern: action_pattern.len(),
+            cursor_action_command: action_command.len(),
+            cursor_action_args: action_args.len(),
         }
     }
 
