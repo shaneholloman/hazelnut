@@ -22,9 +22,9 @@ use crate::config::Config;
 use crate::theme::Theme;
 
 /// Run the TUI application
-pub async fn run(_config_path: Option<PathBuf>) -> Result<()> {
-    // Always load config from default path (~/.config/hazelnut/config.toml)
-    let config = Config::load(None)?;
+pub async fn run(config_path: Option<PathBuf>) -> Result<()> {
+    // Load config from specified path or default (~/.config/hazelnut/config.toml)
+    let config = Config::load(config_path.as_deref())?;
 
     // Load theme from config or use default
     let theme: Theme = config
