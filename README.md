@@ -118,6 +118,12 @@ brew install ricardodantas/tap/hazelnut
 cargo install hazelnut
 ```
 
+##### Arch Linux (pacman)
+
+```bash
+pacman -S hazelnut
+```
+
 #### Windows
 
 ```bash
