@@ -19,6 +19,7 @@ pub struct Watcher {
     engine: RuleEngine,
     rx: mpsc::Receiver<Result<notify::Event, notify::Error>>,
     event_handler: EventHandler,
+    files_processed: u64,
 }
 
 impl Watcher {
@@ -44,6 +45,7 @@ impl Watcher {
             engine,
             rx,
             event_handler: EventHandler::new(debounce_seconds),
+            files_processed: 0,
         })
     }
 
@@ -131,7 +133,13 @@ impl Watcher {
         // Periodically clean up old entries
         self.event_handler.cleanup();
 
+        self.files_processed += processed as u64;
         Ok(processed)
+    }
+
+    /// Get total number of files processed
+    pub fn files_processed(&self) -> u64 {
+        self.files_processed
     }
 
     /// Find the name of the first matching rule for a path

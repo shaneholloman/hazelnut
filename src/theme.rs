@@ -36,9 +36,14 @@ impl Theme {
     }
 
     /// Load theme from config or use default
-    pub fn load() -> anyhow::Result<Theme> {
-        // TODO: Load from config file
-        Ok(Theme::default())
+    pub fn load(config: &crate::config::Config) -> Theme {
+        config
+            .general
+            .theme
+            .as_ref()
+            .and_then(|name| name.parse::<ThemeName>().ok())
+            .map(Theme::from)
+            .unwrap_or_default()
     }
 
     /// Get the color palette for this theme

@@ -249,8 +249,22 @@ impl Action {
 
                 info!("Archiving {} -> {}", path.display(), archive_path.display());
 
-                // TODO: Implement actual zip creation
-                debug!("Archive creation not yet implemented");
+                // Create the zip archive
+                let zip_file = std::fs::File::create(&archive_path)?;
+                let mut zip = zip::ZipWriter::new(zip_file);
+                let options = zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Deflated);
+
+                let file_name = path
+                    .file_name()
+                    .context("File has no name")?
+                    .to_string_lossy();
+                zip.start_file(file_name.as_ref(), options)?;
+                let mut source = std::fs::File::open(path)?;
+                std::io::copy(&mut source, &mut zip)?;
+                zip.finish()?;
+
+                info!("Created archive: {}", archive_path.display());
 
                 if *delete_original {
                     std::fs::remove_file(path)?;

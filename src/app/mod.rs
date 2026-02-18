@@ -2,7 +2,6 @@
 
 mod events;
 mod state;
-mod tui;
 mod ui;
 
 pub use state::AppState;
@@ -34,13 +33,7 @@ pub async fn run(config_path: Option<PathBuf>) -> Result<()> {
     let config = Config::load(config_path.as_deref())?;
 
     // Load theme from config or use default
-    let theme: Theme = config
-        .general
-        .theme
-        .as_ref()
-        .and_then(|name| name.parse::<ratatui_themes::ThemeName>().ok())
-        .map(Theme::from)
-        .unwrap_or_default();
+    let theme = Theme::load(&config);
 
     // Initialize terminal
     enable_raw_mode()?;

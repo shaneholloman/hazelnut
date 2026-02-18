@@ -328,12 +328,23 @@ mod unix_daemon {
     }
 
     async fn run_daemon(config_path: Option<std::path::PathBuf>) -> Result<()> {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
         use tokio::signal::unix::{SignalKind, signal};
         use tokio::time::{Duration, interval};
         use tracing::info;
 
         // Write PID file for foreground mode too
         write_pid(std::process::id())?;
+
+        let start_time = std::time::Instant::now();
+
+        // Set up IPC listener
+        let sock_path = hazelnut::ipc::socket_path();
+        // Clean up stale socket
+        let _ = std::fs::remove_file(&sock_path);
+        let ipc_listener = tokio::net::UnixListener::bind(&sock_path)
+            .with_context(|| format!("Failed to bind IPC socket at {}", sock_path.display()))?;
+        info!("IPC listening on {}", sock_path.display());
 
         // Set up signal handlers
         let mut sigterm = signal(SignalKind::terminate())?;
@@ -436,10 +447,68 @@ mod unix_daemon {
                         _ => {}
                     }
                 }
+                result = ipc_listener.accept() => {
+                    if let Ok((stream, _)) = result {
+                        let reader = BufReader::new(stream);
+                        let mut lines = reader.lines();
+                        if let Ok(Some(line)) = lines.next_line().await {
+                            let response = match serde_json::from_str::<hazelnut::ipc::DaemonCommand>(&line) {
+                                Ok(cmd) => match cmd {
+                                    hazelnut::ipc::DaemonCommand::Status => {
+                                        hazelnut::ipc::DaemonResponse::Status {
+                                            running: true,
+                                            uptime_seconds: start_time.elapsed().as_secs(),
+                                            watches: config.watches.len(),
+                                            rules: config.rules.len(),
+                                            files_processed: watcher.files_processed(),
+                                        }
+                                    }
+                                    hazelnut::ipc::DaemonCommand::Stop => {
+                                        info!("Stop requested via IPC");
+                                        // Send response before breaking
+                                        let resp = serde_json::to_string(&hazelnut::ipc::DaemonResponse::Ok).unwrap_or_default();
+                                        let stream = lines.into_inner().into_inner();
+                                        let mut w = stream;
+                                        let _ = w.write_all(format!("{resp}\n").as_bytes()).await;
+                                        let _ = w.flush().await;
+                                        break;
+                                    }
+                                    hazelnut::ipc::DaemonCommand::Reload => {
+                                        // Trigger reload via SIGHUP to self
+                                        unsafe { libc::kill(std::process::id() as i32, libc::SIGHUP); }
+                                        hazelnut::ipc::DaemonResponse::Ok
+                                    }
+                                    hazelnut::ipc::DaemonCommand::GetLog { limit: _ } => {
+                                        // Log retrieval not yet tracked in-memory
+                                        hazelnut::ipc::DaemonResponse::Log { entries: vec![] }
+                                    }
+                                    hazelnut::ipc::DaemonCommand::GetStats => {
+                                        hazelnut::ipc::DaemonResponse::Status {
+                                            running: true,
+                                            uptime_seconds: start_time.elapsed().as_secs(),
+                                            watches: config.watches.len(),
+                                            rules: config.rules.len(),
+                                            files_processed: watcher.files_processed(),
+                                        }
+                                    }
+                                },
+                                Err(e) => hazelnut::ipc::DaemonResponse::Error {
+                                    message: format!("Invalid command: {e}"),
+                                },
+                            };
+                            let resp_json = serde_json::to_string(&response).unwrap_or_default();
+                            let stream = lines.into_inner().into_inner();
+                            let mut w = stream;
+                            let _ = w.write_all(format!("{resp_json}\n").as_bytes()).await;
+                            let _ = w.flush().await;
+                        }
+                    }
+                }
             }
         }
 
         remove_pid_file();
+        let _ = std::fs::remove_file(&sock_path);
         info!("Daemon stopped");
         Ok(())
     }
