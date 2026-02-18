@@ -254,7 +254,7 @@ jobs:
             desc "Terminal-based automated file organizer inspired by Hazel"
             homepage "https://github.com/ricardodantas/hazelnut"
             version "${VERSION}"
-            license "MIT"
+            license "GPL-3.0"
 
             on_macos do
               on_arm do
