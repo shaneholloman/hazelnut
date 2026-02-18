@@ -126,4 +126,4 @@ Edit `src/pages/themes.astro` and add a new entry to the `themes` array:
 
 ## 📄 License
 
-MIT - Same as the main Hazelnut project.
+GPL-3.0 - Same as the main Hazelnut project.
