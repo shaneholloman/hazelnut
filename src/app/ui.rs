@@ -234,7 +234,11 @@ fn render_dashboard(frame: &mut Frame, state: &AppState, area: Rect) {
     // Logo
     // Logo — pad all lines to equal width so centering preserves alignment
     let logo_raw: Vec<&str> = LOGO.lines().collect();
-    let max_width = logo_raw.iter().map(|l| l.chars().count()).max().unwrap_or(0);
+    let max_width = logo_raw
+        .iter()
+        .map(|l| l.chars().count())
+        .max()
+        .unwrap_or(0);
     let logo_lines: Vec<Line> = logo_raw
         .iter()
         .enumerate()
