@@ -60,6 +60,10 @@ impl Watcher {
         self.watcher.watch(path, mode)?;
         info!("Watching: {} (recursive: {})", path.display(), recursive);
 
+        // Initial scan: process existing files so age-based rules
+        // (e.g. "delete files older than 7 days") work on startup
+        self.scan_existing(path, recursive);
+
         Ok(())
     }
 
@@ -156,4 +160,76 @@ impl Watcher {
     pub fn engine(&self) -> &RuleEngine {
         &self.engine
     }
+
+    /// Scan existing files in a watched directory and apply matching rules.
+    /// This ensures age-based rules (e.g. "delete after 7 days") catch
+    /// files that were already present before the watcher started.
+    fn scan_existing(&mut self, path: &Path, recursive: bool) {
+        let entries: Box<dyn Iterator<Item = std::fs::DirEntry>> = if recursive {
+            match walkdir(path) {
+                Ok(entries) => Box::new(entries.into_iter()),
+                Err(e) => {
+                    error!("Failed to scan directory {}: {}", path.display(), e);
+                    return;
+                }
+            }
+        } else {
+            match std::fs::read_dir(path) {
+                Ok(rd) => Box::new(rd.filter_map(|e| e.ok())),
+                Err(e) => {
+                    error!("Failed to scan directory {}: {}", path.display(), e);
+                    return;
+                }
+            }
+        };
+
+        let mut scanned = 0u64;
+        let mut matched = 0u64;
+
+        for entry in entries {
+            let file_path = entry.path();
+            if file_path.is_file() {
+                scanned += 1;
+                match self.engine.process(&file_path) {
+                    Ok(true) => {
+                        matched += 1;
+                        self.files_processed += 1;
+                    }
+                    Ok(false) => {}
+                    Err(e) => {
+                        error!("Rule processing failed for {}: {}", file_path.display(), e);
+                    }
+                }
+            }
+        }
+
+        if scanned > 0 {
+            info!(
+                "Initial scan of {}: {} files scanned, {} matched rules",
+                path.display(),
+                scanned,
+                matched
+            );
+        }
+    }
+}
+
+/// Recursively collect all file entries from a directory tree.
+fn walkdir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
+    let mut result = Vec::new();
+    walk_recursive(path, &mut result)?;
+    Ok(result)
+}
+
+fn walk_recursive(path: &Path, result: &mut Vec<std::fs::DirEntry>) -> Result<()> {
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let ft = entry.file_type()?;
+        if ft.is_dir() {
+            walk_recursive(&entry.path(), result)?;
+        } else {
+            result.push(entry);
+        }
+    }
+    Ok(())
 }
