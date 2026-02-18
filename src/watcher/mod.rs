@@ -198,6 +198,8 @@ impl Watcher {
                     Ok(false) => {}
                     Err(e) => {
                         error!("Rule processing failed for {}: {}", file_path.display(), e);
+                        let rule_name = self.find_matching_rule_name(&file_path);
+                        crate::notifications::notify_rule_error(&rule_name, &e.to_string());
                     }
                 }
             }

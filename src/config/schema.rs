@@ -47,7 +47,7 @@ pub struct GeneralConfig {
     #[serde(default)]
     pub start_daemon_on_launch: bool,
 
-    /// Enable desktop notifications (future feature)
+    /// Enable desktop notifications for errors
     #[serde(default)]
     pub notifications_enabled: bool,
 
