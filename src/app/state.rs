@@ -989,21 +989,12 @@ fn parse_daemon_log_line(line: &str) -> Option<LogEntry> {
         return None;
     }
 
-    // Find timestamp (ISO format)
-    let mut parts = line.splitn(3, char::is_whitespace);
-    let timestamp_str = match parts.next() {
-        Some(s) => s.trim(),
-        None => return None,
-    };
-    // Skip any extra whitespace to find level
-    let level_str = loop {
-        match parts.next() {
-            Some("") => continue,
-            Some(s) => break s.trim(),
-            None => return None,
-        }
-    };
-    let message = parts.next().unwrap_or("").to_string();
+    // Find timestamp and level using split_whitespace (handles multiple spaces
+    // in tracing output like "2026-02-04T20:12:37Z  INFO message")
+    let mut words = line.split_whitespace();
+    let timestamp_str = words.next()?;
+    let level_str = words.next()?;
+    let message: String = words.collect::<Vec<&str>>().join(" ");
 
     // Parse timestamp
     let timestamp = chrono::DateTime::parse_from_rfc3339(timestamp_str)
