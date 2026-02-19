@@ -89,7 +89,8 @@ pub fn notify_watch_error(path: &str, error: &str) {
 pub fn notify_command_error(command: &str, error: &str) {
     // Truncate command if too long
     let cmd_display = if command.len() > 50 {
-        format!("{}...", &command[..47])
+        let truncated: String = command.chars().take(47).collect();
+        format!("{}...", truncated)
     } else {
         command.to_string()
     };

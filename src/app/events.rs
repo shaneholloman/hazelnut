@@ -654,6 +654,10 @@ fn save_config(state: &mut AppState) {
     if let Err(e) = state.config.save(None) {
         state.set_status(format!("Failed to save config: {}", e));
     }
+    // Restart embedded watcher when daemon is not running so it picks up changes
+    if !state.daemon_running {
+        state.watcher_needs_restart = true;
+    }
 }
 
 fn handle_rule_editor_key(state: &mut AppState, key: KeyEvent) {

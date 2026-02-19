@@ -265,7 +265,9 @@ impl Action {
                             // since ownership was moved into the wait thread.
                             #[cfg(unix)]
                             unsafe {
-                                libc::kill(child_pid as i32, libc::SIGKILL);
+                                if let Ok(pid) = i32::try_from(child_pid) {
+                                    libc::kill(pid, libc::SIGKILL);
+                                }
                             }
                             let err_msg = "timed out after 60s";
                             crate::notifications::notify_command_error(&expanded_command, err_msg);
@@ -284,6 +286,9 @@ impl Action {
                     let (actual_command, base_args): (&str, Vec<&str>) =
                         if args.is_empty() && command.contains(' ') {
                             let parts: Vec<&str> = command.split_whitespace().collect();
+                            if parts.is_empty() {
+                                anyhow::bail!("Empty command");
+                            }
                             (parts[0], parts[1..].to_vec())
                         } else {
                             (command.as_str(), vec![])
@@ -321,7 +326,9 @@ impl Action {
                         Err(_) => {
                             #[cfg(unix)]
                             unsafe {
-                                libc::kill(child_pid as i32, libc::SIGKILL);
+                                if let Ok(pid) = i32::try_from(child_pid) {
+                                    libc::kill(pid, libc::SIGKILL);
+                                }
                             }
                             let err_msg = "timed out after 60s";
                             crate::notifications::notify_command_error(
@@ -407,7 +414,11 @@ impl Action {
                 info!("Created archive: {}", archive_path.display());
 
                 if *delete_original {
-                    std::fs::remove_file(path)?;
+                    if path.is_dir() {
+                        std::fs::remove_dir_all(path)?;
+                    } else {
+                        std::fs::remove_file(path)?;
+                    }
                 }
             }
 
