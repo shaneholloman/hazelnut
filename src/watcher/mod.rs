@@ -20,6 +20,8 @@ pub struct Watcher {
     rx: mpsc::Receiver<Result<notify::Event, notify::Error>>,
     event_handler: EventHandler,
     files_processed: u64,
+    /// Mapping of watched directory path → allowed rule names (empty = all rules)
+    watch_rules: std::collections::HashMap<std::path::PathBuf, Vec<String>>,
 }
 
 impl Watcher {
@@ -46,11 +48,22 @@ impl Watcher {
             rx,
             event_handler: EventHandler::new(debounce_seconds),
             files_processed: 0,
+            watch_rules: std::collections::HashMap::new(),
         })
     }
 
     /// Start watching a directory
     pub fn watch(&mut self, path: &Path, recursive: bool) -> Result<()> {
+        self.watch_with_rules(path, recursive, Vec::new())
+    }
+
+    /// Start watching a directory with a specific set of allowed rule names
+    pub fn watch_with_rules(
+        &mut self,
+        path: &Path,
+        recursive: bool,
+        rules: Vec<String>,
+    ) -> Result<()> {
         let mode = if recursive {
             RecursiveMode::Recursive
         } else {
@@ -58,10 +71,11 @@ impl Watcher {
         };
 
         self.watcher.watch(path, mode)?;
+        let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        self.watch_rules.insert(canonical, rules);
         info!("Watching: {} (recursive: {})", path.display(), recursive);
 
-        // Initial scan: process existing files so age-based rules
-        // (e.g. "delete files older than 7 days") work on startup
+        // Initial scan
         self.scan_existing(path, recursive);
 
         Ok(())
@@ -113,7 +127,8 @@ impl Watcher {
                                 continue;
                             }
                             info!("File event detected: {}", path.display());
-                            match self.engine.process(&path) {
+                            let allowed = self.allowed_rules_for(&path);
+                            match self.engine.process_filtered(&path, allowed) {
                                 Ok(true) => processed += 1,
                                 Ok(false) => {} // No matching rule
                                 Err(e) => {
@@ -121,7 +136,7 @@ impl Watcher {
                                     // Find which rule matched (if any) for the notification
                                     let rule_name = self
                                         .engine
-                                        .evaluate(&path)
+                                        .evaluate_filtered(&path, allowed)
                                         .ok()
                                         .flatten()
                                         .map(|_| self.find_matching_rule_name(&path))
@@ -168,10 +183,41 @@ impl Watcher {
         &self.engine
     }
 
+    /// Find the allowed rules filter for a file path based on which watch directory it belongs to
+    fn allowed_rules_for(&self, file_path: &Path) -> Option<&[String]> {
+        let canonical =
+            std::fs::canonicalize(file_path).unwrap_or_else(|_| file_path.to_path_buf());
+        // Find the watch directory that is a prefix of this file path
+        let mut best_match: Option<(&std::path::PathBuf, &Vec<String>)> = None;
+        for (watch_path, rules) in &self.watch_rules {
+            if canonical.starts_with(watch_path) {
+                // Pick the longest (most specific) match
+                if best_match
+                    .is_none_or(|(prev, _)| watch_path.as_os_str().len() > prev.as_os_str().len())
+                {
+                    best_match = Some((watch_path, rules));
+                }
+            }
+        }
+        match best_match {
+            Some((_, rules)) if !rules.is_empty() => Some(rules.as_slice()),
+            _ => None,
+        }
+    }
+
     /// Scan existing files in a watched directory and apply matching rules.
     /// This ensures age-based rules (e.g. "delete after 7 days") catch
     /// files that were already present before the watcher started.
     fn scan_existing(&mut self, path: &Path, recursive: bool) {
+        // Get allowed rules for this watch path
+        let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let allowed_rules: Option<Vec<String>> = self
+            .watch_rules
+            .get(&canonical)
+            .filter(|r| !r.is_empty())
+            .cloned();
+        let allowed = allowed_rules.as_deref();
+
         let entries: Box<dyn Iterator<Item = std::fs::DirEntry>> = if recursive {
             match walkdir(path) {
                 Ok(entries) => Box::new(entries.into_iter()),
@@ -203,7 +249,7 @@ impl Watcher {
                     continue;
                 }
                 scanned += 1;
-                match self.engine.process(&file_path) {
+                match self.engine.process_filtered(&file_path, allowed) {
                     Ok(true) => {
                         matched += 1;
                         self.files_processed += 1;

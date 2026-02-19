@@ -181,7 +181,9 @@ fn create_embedded_watcher(config: &crate::Config) -> Result<crate::Watcher> {
 
     for watch in &config.watches {
         let expanded_path = crate::expand_path(&watch.path);
-        if let Err(e) = watcher.watch(&expanded_path, watch.recursive) {
+        if let Err(e) =
+            watcher.watch_with_rules(&expanded_path, watch.recursive, watch.rules.clone())
+        {
             tracing::error!("Failed to watch {}: {}", expanded_path.display(), e);
         }
     }

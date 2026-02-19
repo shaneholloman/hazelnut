@@ -373,7 +373,9 @@ mod unix_daemon {
         for watch in &config.watches {
             let expanded_path = hazelnut::expand_path(&watch.path);
             info!("Watching: {}", expanded_path.display());
-            if let Err(e) = watcher.watch(&expanded_path, watch.recursive) {
+            if let Err(e) =
+                watcher.watch_with_rules(&expanded_path, watch.recursive, watch.rules.clone())
+            {
                 tracing::error!("Failed to watch {}: {}", expanded_path.display(), e);
                 hazelnut::notifications::notify_watch_error(
                     &expanded_path.display().to_string(),
@@ -414,7 +416,7 @@ mod unix_daemon {
                                 Ok(mut new_watcher) => {
                                     for watch in &config.watches {
                                         let expanded_path = hazelnut::expand_path(&watch.path);
-                                        if let Err(e) = new_watcher.watch(&expanded_path, watch.recursive) {
+                                        if let Err(e) = new_watcher.watch_with_rules(&expanded_path, watch.recursive, watch.rules.clone()) {
                                             tracing::error!("Failed to watch {}: {}", expanded_path.display(), e);
                                             hazelnut::notifications::notify_watch_error(
                                                 &expanded_path.display().to_string(),
