@@ -5,6 +5,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+/// Maximum number of entries in the debounce map before forcing a cleanup
+const MAX_DEBOUNCE_ENTRIES: usize = 10_000;
+
 /// Debounces file system events to avoid processing the same file multiple times
 pub struct EventHandler {
     /// Recent events by path
@@ -39,6 +42,11 @@ impl EventHandler {
                 self.recent.insert(path.clone(), now);
                 paths_to_process.push(path.clone());
             }
+        }
+
+        // If the map has grown too large, force a cleanup
+        if self.recent.len() > MAX_DEBOUNCE_ENTRIES {
+            self.cleanup();
         }
 
         paths_to_process

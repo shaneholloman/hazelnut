@@ -11,6 +11,9 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tracing::{debug, error, info};
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::rules::{Rule, RuleEngine};
 
 /// File system watcher that monitors directories and applies rules
@@ -19,9 +22,11 @@ pub struct Watcher {
     engine: RuleEngine,
     rx: mpsc::Receiver<Result<notify::Event, notify::Error>>,
     event_handler: EventHandler,
-    files_processed: u64,
+    files_processed: Arc<AtomicU64>,
     /// Mapping of watched directory path → allowed rule names (empty = all rules)
     watch_rules: std::collections::HashMap<std::path::PathBuf, Vec<String>>,
+    /// Cache of canonical paths for watched directories
+    canonical_cache: std::collections::HashMap<std::path::PathBuf, std::path::PathBuf>,
 }
 
 impl Watcher {
@@ -47,8 +52,9 @@ impl Watcher {
             engine,
             rx,
             event_handler: EventHandler::new(debounce_seconds),
-            files_processed: 0,
+            files_processed: Arc::new(AtomicU64::new(0)),
             watch_rules: std::collections::HashMap::new(),
+            canonical_cache: std::collections::HashMap::new(),
         })
     }
 
@@ -73,6 +79,8 @@ impl Watcher {
         self.watcher.watch(path, mode)?;
         let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
         self.watch_rules.insert(canonical.clone(), rules);
+        self.canonical_cache
+            .insert(canonical.clone(), canonical.clone());
         info!("Watching: {} (recursive: {})", path.display(), recursive);
 
         // Initial scan — run in a background thread so TUI startup isn't blocked.
@@ -83,8 +91,9 @@ impl Watcher {
             .get(&canonical)
             .filter(|r| !r.is_empty())
             .cloned();
+        let counter = Arc::clone(&self.files_processed);
         std::thread::spawn(move || {
-            scan_existing_background(&scan_path, recursive, scan_rules, allowed_rules);
+            scan_existing_background(&scan_path, recursive, scan_rules, allowed_rules, counter);
         });
 
         Ok(())
@@ -111,11 +120,11 @@ impl Watcher {
         Ok(events)
     }
 
-    /// Process events and apply rules (with debouncing)
-    pub fn process_events(&mut self) -> Result<usize> {
+    /// Process already-polled events and apply rules (with debouncing)
+    pub fn process_polled_events(&mut self, events: Vec<notify::Event>) -> Result<usize> {
         let mut processed = 0;
 
-        for event in self.poll()? {
+        for event in events {
             debug!("Event: {:?}", event.kind);
 
             // Only process create and modify events
@@ -157,18 +166,26 @@ impl Watcher {
         // Periodically clean up old entries
         self.event_handler.cleanup();
 
-        self.files_processed += processed as u64;
+        self.files_processed
+            .fetch_add(processed as u64, Ordering::Relaxed);
         Ok(processed)
     }
 
     /// Get total number of files processed
     pub fn files_processed(&self) -> u64 {
-        self.files_processed
+        self.files_processed.load(Ordering::Relaxed)
+    }
+
+    /// Process events and apply rules (polls + processes, convenience method)
+    pub fn process_events(&mut self) -> Result<usize> {
+        let events = self.poll()?;
+        self.process_polled_events(events)
     }
 
     /// Carry over files_processed count from a previous watcher (e.g. on config reload)
     pub fn carry_over_files_processed(&mut self, old: &Watcher) {
-        self.files_processed = old.files_processed;
+        self.files_processed
+            .store(old.files_processed(), Ordering::Relaxed);
     }
 
     /// Find the name of the first matching rule for a path
@@ -190,16 +207,23 @@ impl Watcher {
     fn allowed_rules_for(&self, file_path: &Path) -> Option<&[String]> {
         let canonical =
             std::fs::canonicalize(file_path).unwrap_or_else(|_| file_path.to_path_buf());
-        // Find the watch directory that is a prefix of this file path
+        // Find the watch directory that is a prefix of this file path using cached canonical paths
         let mut best_match: Option<(&std::path::PathBuf, &Vec<String>)> = None;
         for (watch_path, rules) in &self.watch_rules {
-            if canonical.starts_with(watch_path) {
-                // Pick the longest (most specific) match
-                if best_match
-                    .is_none_or(|(prev, _)| watch_path.as_os_str().len() > prev.as_os_str().len())
-                {
-                    best_match = Some((watch_path, rules));
-                }
+            // Use cached canonical path for the watch directory
+            let watch_canonical = self.canonical_cache.get(watch_path).unwrap_or(watch_path);
+            if canonical.starts_with(watch_canonical)
+                && best_match.is_none_or(|(prev, _)| {
+                    watch_canonical.as_os_str().len()
+                        > self
+                            .canonical_cache
+                            .get(prev)
+                            .unwrap_or(prev)
+                            .as_os_str()
+                            .len()
+                })
+            {
+                best_match = Some((watch_path, rules));
             }
         }
         match best_match {
@@ -215,6 +239,7 @@ fn scan_existing_background(
     recursive: bool,
     rules: Vec<Rule>,
     allowed_rules: Option<Vec<String>>,
+    counter: Arc<AtomicU64>,
 ) {
     let engine = RuleEngine::new(rules);
     let allowed = allowed_rules.as_deref();
@@ -272,6 +297,7 @@ fn scan_existing_background(
             scanned,
             matched
         );
+        counter.fetch_add(matched, Ordering::Relaxed);
     }
 }
 

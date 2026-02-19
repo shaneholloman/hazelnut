@@ -234,13 +234,39 @@ impl Action {
 
                     info!("Running (shell): {}", expanded_command);
 
-                    let status = std::process::Command::new(shell)
+                    let mut child = std::process::Command::new(shell)
                         .arg(shell_arg)
                         .arg(&expanded_command)
-                        .status()
+                        .spawn()
                         .with_context(|| {
                             format!("Failed to run shell command: {}", expanded_command)
                         })?;
+
+                    // Wait with a 60-second timeout
+                    let timeout = std::time::Duration::from_secs(60);
+                    let start = std::time::Instant::now();
+                    let status = loop {
+                        match child.try_wait() {
+                            Ok(Some(status)) => break status,
+                            Ok(None) => {
+                                if start.elapsed() > timeout {
+                                    let _ = child.kill();
+                                    let _ = child.wait();
+                                    let err_msg = "timed out after 60s";
+                                    crate::notifications::notify_command_error(
+                                        &expanded_command,
+                                        err_msg,
+                                    );
+                                    anyhow::bail!(
+                                        "Command timed out after 60s: {}",
+                                        expanded_command
+                                    );
+                                }
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                            }
+                            Err(e) => return Err(e.into()),
+                        }
+                    };
 
                     if !status.success() {
                         let err_msg = format!("exited with status {}", status);
@@ -267,10 +293,36 @@ impl Action {
 
                     info!("Running: {} {:?}", actual_command, expanded_args);
 
-                    let status = std::process::Command::new(actual_command)
+                    let mut child = std::process::Command::new(actual_command)
                         .args(&expanded_args)
-                        .status()
+                        .spawn()
                         .with_context(|| format!("Failed to run command: {}", actual_command))?;
+
+                    // Wait with a 60-second timeout
+                    let timeout = std::time::Duration::from_secs(60);
+                    let start = std::time::Instant::now();
+                    let status = loop {
+                        match child.try_wait() {
+                            Ok(Some(status)) => break status,
+                            Ok(None) => {
+                                if start.elapsed() > timeout {
+                                    let _ = child.kill();
+                                    let _ = child.wait();
+                                    let err_msg = "timed out after 60s";
+                                    crate::notifications::notify_command_error(
+                                        actual_command,
+                                        err_msg,
+                                    );
+                                    anyhow::bail!(
+                                        "Command timed out after 60s: {}",
+                                        actual_command
+                                    );
+                                }
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                            }
+                            Err(e) => return Err(e.into()),
+                        }
+                    };
 
                     if !status.success() {
                         let err_msg = format!("exited with status {}", status);

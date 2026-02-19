@@ -62,13 +62,13 @@ pub async fn run(config_path: Option<PathBuf>) -> Result<()> {
             .args(["start"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .status()
+            .spawn()
         {
-            Ok(status) if status.success() => {
+            Ok(_child) => {
                 state.daemon_running = true;
                 state.status_message = Some("Daemon started automatically".to_string());
             }
-            Ok(_) | Err(_) => {
+            Err(_) => {
                 // Silently fail - daemon might already be running
             }
         }
@@ -164,16 +164,26 @@ fn run_app(
             }
         }
 
-        // Process embedded watcher events
+        // Process embedded watcher events in a background thread to avoid blocking the UI
         if let Some(watcher) = embedded_watcher {
-            match watcher.process_events() {
-                Ok(count) if count > 0 => {
-                    tracing::info!("Processed {} files", count);
-                }
+            // Only poll events (non-blocking) and spawn processing if there are events
+            let events = match watcher.poll() {
+                Ok(events) => events,
                 Err(e) => {
-                    tracing::error!("Watcher error: {}", e);
+                    tracing::error!("Watcher poll error: {}", e);
+                    vec![]
                 }
-                _ => {}
+            };
+            if !events.is_empty() {
+                match watcher.process_polled_events(events) {
+                    Ok(count) if count > 0 => {
+                        tracing::info!("Processed {} files", count);
+                    }
+                    Err(e) => {
+                        tracing::error!("Watcher error: {}", e);
+                    }
+                    _ => {}
+                }
             }
         }
 

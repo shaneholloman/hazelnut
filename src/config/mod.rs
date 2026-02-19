@@ -52,9 +52,11 @@ impl Config {
     }
 
     /// Get the default config file path
-    /// Always uses ~/.config/hazelnut/config.toml for consistency across platforms
+    /// Uses the platform config directory (via dirs::config_dir), falling back to ~/.config
     pub fn default_path() -> Option<PathBuf> {
-        dirs::home_dir().map(|d| d.join(".config").join("hazelnut").join("config.toml"))
+        let config_base =
+            dirs::config_dir().or_else(|| dirs::home_dir().map(|d| d.join(".config")))?;
+        Some(config_base.join("hazelnut").join("config.toml"))
     }
 
     /// Get the default data directory

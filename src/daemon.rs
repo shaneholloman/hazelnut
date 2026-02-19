@@ -416,6 +416,11 @@ mod unix_daemon {
             MAX_LOG_ENTRIES,
         );
 
+        use std::sync::atomic::AtomicBool;
+
+        // Flag to signal stop from spawned IPC tasks
+        let stop_flag = Arc::new(AtomicBool::new(false));
+
         // Poll for events periodically
         let mut poll_interval = interval(Duration::from_millis(500));
 
@@ -470,6 +475,11 @@ mod unix_daemon {
                     }
                 }
                 _ = poll_interval.tick() => {
+                    // Check if stop was requested by an IPC task
+                    if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                        info!("Stop flag set, shutting down...");
+                        break;
+                    }
                     match watcher.process_events() {
                         Ok(count) if count > 0 => {
                             let msg = format!("[{}] Processed {} file(s)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), count);
@@ -486,63 +496,76 @@ mod unix_daemon {
                 }
                 result = ipc_listener.accept() => {
                     if let Ok((stream, _)) = result {
-                        let reader = BufReader::new(stream);
-                        let mut lines = reader.lines();
-                        if let Ok(Some(line)) = lines.next_line().await {
-                            let response = match serde_json::from_str::<hazelnut::ipc::DaemonCommand>(&line) {
-                                Ok(cmd) => match cmd {
-                                    hazelnut::ipc::DaemonCommand::Status => {
-                                        hazelnut::ipc::DaemonResponse::Status {
-                                            running: true,
-                                            uptime_seconds: start_time.elapsed().as_secs(),
-                                            watches: config.watches.len(),
-                                            rules: config.rules.len(),
-                                            files_processed: watcher.files_processed(),
+                        let log_buf = Arc::clone(&log_buffer);
+                        let uptime_start = start_time;
+                        let num_watches = config.watches.len();
+                        let num_rules = config.rules.len();
+                        let files_count = watcher.files_processed();
+                        let stop = Arc::clone(&stop_flag);
+
+                        tokio::spawn(async move {
+                            let reader = BufReader::new(stream);
+                            let mut lines = reader.lines();
+                            if let Ok(Some(line)) = lines.next_line().await {
+                                let response = match serde_json::from_str::<hazelnut::ipc::DaemonCommand>(&line) {
+                                    Ok(cmd) => match cmd {
+                                        hazelnut::ipc::DaemonCommand::Status => {
+                                            hazelnut::ipc::DaemonResponse::Status {
+                                                running: true,
+                                                uptime_seconds: uptime_start.elapsed().as_secs(),
+                                                watches: num_watches,
+                                                rules: num_rules,
+                                                files_processed: files_count,
+                                            }
                                         }
-                                    }
-                                    hazelnut::ipc::DaemonCommand::Stop => {
-                                        info!("Stop requested via IPC");
-                                        // Send response before breaking
-                                        let resp = serde_json::to_string(&hazelnut::ipc::DaemonResponse::Ok).unwrap_or_default();
-                                        let stream = lines.into_inner().into_inner();
-                                        let mut w = stream;
-                                        let _ = w.write_all(format!("{resp}\n").as_bytes()).await;
-                                        let _ = w.flush().await;
-                                        break;
-                                    }
-                                    hazelnut::ipc::DaemonCommand::Reload => {
-                                        // Trigger reload via SIGHUP to self
-                                        unsafe { libc::kill(std::process::id() as i32, libc::SIGHUP); }
-                                        hazelnut::ipc::DaemonResponse::Ok
-                                    }
-                                    hazelnut::ipc::DaemonCommand::GetLog { limit } => {
-                                        let entries = if let Ok(ring) = log_buffer.lock() {
-                                            let skip = ring.len().saturating_sub(limit);
-                                            ring.iter().skip(skip).cloned().collect()
-                                        } else {
-                                            vec![]
-                                        };
-                                        hazelnut::ipc::DaemonResponse::Log { entries }
-                                    }
-                                    hazelnut::ipc::DaemonCommand::GetStats => {
-                                        hazelnut::ipc::DaemonResponse::Status {
-                                            running: true,
-                                            uptime_seconds: start_time.elapsed().as_secs(),
-                                            watches: config.watches.len(),
-                                            rules: config.rules.len(),
-                                            files_processed: watcher.files_processed(),
+                                        hazelnut::ipc::DaemonCommand::Stop => {
+                                            info!("Stop requested via IPC");
+                                            let resp = serde_json::to_string(&hazelnut::ipc::DaemonResponse::Ok).unwrap_or_default();
+                                            let stream = lines.into_inner().into_inner();
+                                            let mut w = stream;
+                                            let _ = w.write_all(format!("{resp}\n").as_bytes()).await;
+                                            let _ = w.flush().await;
+                                            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+                                            return;
                                         }
-                                    }
-                                },
-                                Err(e) => hazelnut::ipc::DaemonResponse::Error {
-                                    message: format!("Invalid command: {e}"),
-                                },
-                            };
-                            let resp_json = serde_json::to_string(&response).unwrap_or_default();
-                            let stream = lines.into_inner().into_inner();
-                            let mut w = stream;
-                            let _ = w.write_all(format!("{resp_json}\n").as_bytes()).await;
-                            let _ = w.flush().await;
+                                        hazelnut::ipc::DaemonCommand::Reload => {
+                                            unsafe { libc::kill(std::process::id() as i32, libc::SIGHUP); }
+                                            hazelnut::ipc::DaemonResponse::Ok
+                                        }
+                                        hazelnut::ipc::DaemonCommand::GetLog { limit } => {
+                                            let entries = if let Ok(ring) = log_buf.lock() {
+                                                let skip = ring.len().saturating_sub(limit);
+                                                ring.iter().skip(skip).cloned().collect()
+                                            } else {
+                                                vec![]
+                                            };
+                                            hazelnut::ipc::DaemonResponse::Log { entries }
+                                        }
+                                        hazelnut::ipc::DaemonCommand::GetStats => {
+                                            hazelnut::ipc::DaemonResponse::Status {
+                                                running: true,
+                                                uptime_seconds: uptime_start.elapsed().as_secs(),
+                                                watches: num_watches,
+                                                rules: num_rules,
+                                                files_processed: files_count,
+                                            }
+                                        }
+                                    },
+                                    Err(e) => hazelnut::ipc::DaemonResponse::Error {
+                                        message: format!("Invalid command: {e}"),
+                                    },
+                                };
+                                let resp_json = serde_json::to_string(&response).unwrap_or_default();
+                                let stream = lines.into_inner().into_inner();
+                                let mut w = stream;
+                                let _ = w.write_all(format!("{resp_json}\n").as_bytes()).await;
+                                let _ = w.flush().await;
+                            }
+                        });
+
+                        // Check if stop was requested
+                        if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                            break;
                         }
                     }
                 }

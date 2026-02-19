@@ -102,8 +102,15 @@ impl RuleEngine {
         if actions.is_empty() {
             return Ok(false);
         }
-        for action in actions {
+        for action in &actions {
             action.execute(path)?;
+            // After a destructive action, the file is gone — stop processing
+            if matches!(
+                action,
+                Action::Move { .. } | Action::Rename { .. } | Action::Trash | Action::Delete
+            ) {
+                break;
+            }
         }
         Ok(true)
     }
@@ -114,8 +121,15 @@ impl RuleEngine {
         if actions.is_empty() {
             return Ok(false);
         }
-        for action in actions {
+        for action in &actions {
             action.execute(path)?;
+            // After a destructive action, the file is gone — stop processing
+            if matches!(
+                action,
+                Action::Move { .. } | Action::Rename { .. } | Action::Trash | Action::Delete
+            ) {
+                break;
+            }
         }
         Ok(true)
     }
