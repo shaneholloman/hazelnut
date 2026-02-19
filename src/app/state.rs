@@ -331,12 +331,12 @@ impl AppState {
             return; // No new data
         }
 
-        if let Err(_) = file.seek(SeekFrom::Start(self.log_file_position)) {
+        if file.seek(SeekFrom::Start(self.log_file_position)).is_err() {
             return;
         }
 
         let mut new_content = String::new();
-        if let Err(_) = file.read_to_string(&mut new_content) {
+        if file.read_to_string(&mut new_content).is_err() {
             return;
         }
 

@@ -94,7 +94,7 @@ impl Action {
                 }
 
                 info!("Moving {} -> {}", path.display(), dest_path.display());
-                if let Err(_) = std::fs::rename(path, &dest_path) {
+                if std::fs::rename(path, &dest_path).is_err() {
                     // rename fails across filesystems; fall back to copy + remove
                     std::fs::copy(path, &dest_path).with_context(|| {
                         format!(
@@ -170,7 +170,7 @@ impl Action {
                     }
                 }
 
-                if let Err(_) = std::fs::rename(path, &trash_path) {
+                if std::fs::rename(path, &trash_path).is_err() {
                     std::fs::copy(path, &trash_path)?;
                     std::fs::remove_file(path)?;
                 }

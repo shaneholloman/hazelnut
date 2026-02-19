@@ -128,7 +128,7 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) {
                 .iter()
                 .position(|t| *t == state.theme.inner())
                 .unwrap_or(0);
-            state.original_theme = Some(state.theme.clone());
+            state.original_theme = Some(state.theme);
             state.mode = Mode::ThemePicker;
             return;
         }
@@ -495,7 +495,7 @@ fn handle_settings_action(state: &mut AppState) {
         }
         SettingsItem::ThemeSelection => {
             // Switch to theme picker
-            state.original_theme = Some(state.theme.clone());
+            state.original_theme = Some(state.theme);
             state.theme_picker_index = Theme::all()
                 .iter()
                 .position(|t| *t == state.theme.inner())
