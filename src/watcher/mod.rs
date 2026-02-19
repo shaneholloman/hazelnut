@@ -246,7 +246,7 @@ fn scan_existing_background(
 
     let entries: Box<dyn Iterator<Item = std::fs::DirEntry>> = if recursive {
         match walkdir(path) {
-            Ok(entries) => Box::new(entries.into_iter()),
+            Ok(entries) => entries,
             Err(e) => {
                 error!("Failed to scan directory {}: {}", path.display(), e);
                 return;
@@ -301,10 +301,18 @@ fn scan_existing_background(
     }
 }
 
-/// Recursively iterate all file entries from a directory tree without collecting into Vec.
-fn walkdir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
-    let mut result = Vec::new();
+/// Recursively iterate all file entries from a directory tree.
+/// Returns a boxed iterator to avoid collecting into a Vec.
+fn walkdir(path: &Path) -> Result<Box<dyn Iterator<Item = std::fs::DirEntry>>> {
     let mut stack = vec![path.to_path_buf()];
+    let mut entries = Vec::new();
+
+    // NOTE: We still collect into a Vec internally because returning a true
+    // lazy iterator over a recursive directory walk requires either unsafe
+    // self-referential types or a crate like `walkdir`. The allocation is
+    // bounded by the number of files on disk, which is unavoidable for a
+    // full-tree scan. The Box<dyn Iterator> signature keeps the public API
+    // ready for a zero-alloc implementation in the future.
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir)? {
             let entry = entry?;
@@ -315,9 +323,9 @@ fn walkdir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
             if ft.is_dir() {
                 stack.push(entry.path());
             } else {
-                result.push(entry);
+                entries.push(entry);
             }
         }
     }
-    Ok(result)
+    Ok(Box::new(entries.into_iter()))
 }

@@ -29,7 +29,7 @@ impl Config {
         }
     }
 
-    /// Save configuration to a file
+    /// Save configuration to a file (with advisory file locking)
     pub fn save(&self, path: Option<&Path>) -> Result<()> {
         let config_path = path
             .map(PathBuf::from)
@@ -45,10 +45,26 @@ impl Config {
 
         let content = toml::to_string_pretty(self).context("Failed to serialize config")?;
 
-        std::fs::write(&config_path, content)
-            .with_context(|| format!("Failed to write config to {}", config_path.display()))?;
+        // Use a lockfile to prevent concurrent writes
+        let lock_path = config_path.with_extension("toml.lock");
+        let lock_file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&lock_path)
+            .with_context(|| format!("Failed to create lock file: {}", lock_path.display()))?;
 
-        Ok(())
+        use fs2::FileExt;
+        lock_file
+            .lock_exclusive()
+            .with_context(|| "Failed to acquire config file lock")?;
+
+        let result = std::fs::write(&config_path, content)
+            .with_context(|| format!("Failed to write config to {}", config_path.display()));
+
+        let _ = lock_file.unlock();
+
+        result
     }
 
     /// Get the default config file path

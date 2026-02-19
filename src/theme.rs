@@ -157,9 +157,11 @@ impl ThemeColors {
         if let Color::Rgb(r, g, b) = color {
             let adjust = |c: u8| -> u8 {
                 if amount > 0 {
-                    c.saturating_add(amount as u8)
+                    c.saturating_add(amount.min(255) as u8)
                 } else {
-                    c.saturating_sub((-amount) as u8)
+                    // Clamp to avoid panic: (-i16::MIN) overflows, so clamp first
+                    let neg = (-(amount.max(-255))) as u8;
+                    c.saturating_sub(neg)
                 }
             };
             Color::Rgb(adjust(r), adjust(g), adjust(b))

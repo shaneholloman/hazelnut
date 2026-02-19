@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-// Simple thread-local caches for compiled patterns
+// Simple thread-local caches for compiled patterns.
+// Capped at 1000 entries; cleared entirely when the cap is exceeded.
+const CACHE_MAX_ENTRIES: usize = 1000;
+
 std::thread_local! {
     static GLOB_CACHE: std::cell::RefCell<HashMap<String, glob::Pattern>> = std::cell::RefCell::new(HashMap::new());
     static REGEX_CACHE: std::cell::RefCell<HashMap<String, Regex>> = std::cell::RefCell::new(HashMap::new());
@@ -88,47 +91,46 @@ impl Condition {
             return Ok(false);
         }
 
-        // Check file size
-        if self.size_greater_than.is_some() || self.size_less_than.is_some() {
-            match path.metadata() {
-                Ok(metadata) => {
-                    let size = metadata.len();
-
-                    if let Some(min) = self.size_greater_than
-                        && size <= min
-                    {
-                        return Ok(false);
-                    }
-
-                    if let Some(max) = self.size_less_than
-                        && size >= max
-                    {
-                        return Ok(false);
-                    }
-                }
+        // Check file size and age using a single metadata call
+        if self.size_greater_than.is_some()
+            || self.size_less_than.is_some()
+            || self.age_days_greater_than.is_some()
+            || self.age_days_less_than.is_some()
+        {
+            let metadata = match path.metadata() {
+                Ok(m) => m,
                 Err(_) => return Ok(false),
+            };
+
+            if let Some(min) = self.size_greater_than
+                && metadata.len() <= min
+            {
+                return Ok(false);
             }
-        }
+            if let Some(max) = self.size_less_than
+                && metadata.len() >= max
+            {
+                return Ok(false);
+            }
 
-        // Check file age
-        if self.age_days_greater_than.is_some() || self.age_days_less_than.is_some() {
-            match path.metadata().and_then(|m| m.modified()) {
-                Ok(modified) => {
-                    let age = modified.elapsed().map(|d| d.as_secs() / 86400).unwrap_or(0);
+            if self.age_days_greater_than.is_some() || self.age_days_less_than.is_some() {
+                match metadata.modified() {
+                    Ok(modified) => {
+                        let age = modified.elapsed().map(|d| d.as_secs() / 86400).unwrap_or(0);
 
-                    if let Some(min_days) = self.age_days_greater_than
-                        && age <= min_days
-                    {
-                        return Ok(false);
+                        if let Some(min_days) = self.age_days_greater_than
+                            && age <= min_days
+                        {
+                            return Ok(false);
+                        }
+                        if let Some(max_days) = self.age_days_less_than
+                            && age >= max_days
+                        {
+                            return Ok(false);
+                        }
                     }
-
-                    if let Some(max_days) = self.age_days_less_than
-                        && age >= max_days
-                    {
-                        return Ok(false);
-                    }
+                    Err(_) => return Ok(false),
                 }
-                Err(_) => return Ok(false),
             }
         }
 
@@ -163,6 +165,9 @@ fn check_glob(path: &Path, pattern: &str) -> Result<bool> {
     let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     GLOB_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
+        if cache.len() >= CACHE_MAX_ENTRIES && !cache.contains_key(pattern) {
+            cache.clear();
+        }
         let glob_pattern = if let Some(p) = cache.get(pattern) {
             p.clone()
         } else {
@@ -178,6 +183,9 @@ fn check_regex(path: &Path, pattern: &str) -> Result<bool> {
     let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     REGEX_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
+        if cache.len() >= CACHE_MAX_ENTRIES && !cache.contains_key(pattern) {
+            cache.clear();
+        }
         let regex = if let Some(r) = cache.get(pattern) {
             r.clone()
         } else {

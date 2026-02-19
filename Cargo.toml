@@ -47,6 +47,8 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 shell-escape = "0.1"
 trash = "5"
 shlex = "1"
+fs2 = "0.4"
+indexmap = "2"
 
 [dev-dependencies]
 tempfile = "3.19"

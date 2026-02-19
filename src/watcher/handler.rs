@@ -1,7 +1,7 @@
 //! Event handler for file system events
 
+use indexmap::IndexMap;
 use notify::Event;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -10,8 +10,8 @@ const MAX_DEBOUNCE_ENTRIES: usize = 10_000;
 
 /// Debounces file system events to avoid processing the same file multiple times
 pub struct EventHandler {
-    /// Recent events by path
-    recent: HashMap<PathBuf, Instant>,
+    /// Recent events by path (IndexMap preserves insertion order for fair cleanup)
+    recent: IndexMap<PathBuf, Instant>,
 
     /// Debounce duration
     debounce: Duration,
@@ -21,7 +21,7 @@ impl EventHandler {
     /// Create a new event handler with the given debounce duration
     pub fn new(debounce_seconds: u64) -> Self {
         Self {
-            recent: HashMap::new(),
+            recent: IndexMap::new(),
             debounce: Duration::from_secs(debounce_seconds),
         }
     }

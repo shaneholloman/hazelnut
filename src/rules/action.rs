@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use tracing::{debug, info};
 
+#[cfg(unix)]
+use libc;
+
 /// Pre-compiled regex for `{date:FORMAT}` patterns.
 static DATE_FORMAT_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{date:([^}]+)\}").expect("invalid date format regex"));
@@ -234,7 +237,7 @@ impl Action {
 
                     info!("Running (shell): {}", expanded_command);
 
-                    let child = std::process::Command::new(shell)
+                    let mut child = std::process::Command::new(shell)
                         .arg(shell_arg)
                         .arg(&expanded_command)
                         .spawn()
@@ -242,21 +245,28 @@ impl Action {
                             format!("Failed to run shell command: {}", expanded_command)
                         })?;
 
+                    // Grab the PID before moving child into the wait thread, so we
+                    // can kill the process on timeout (the thread owns the Child).
+                    let child_pid = child.id();
+
                     // Wait with a 60-second timeout using a channel
                     let timeout = std::time::Duration::from_secs(60);
                     let (tx, rx) = std::sync::mpsc::channel();
-                    let mut child_for_thread = child;
                     std::thread::spawn(move || {
-                        let result = child_for_thread.wait();
-                        let _ = tx.send((result, child_for_thread));
+                        let result = child.wait();
+                        let _ = tx.send(result);
                     });
 
                     let status = match rx.recv_timeout(timeout) {
-                        Ok((Ok(status), _)) => status,
-                        Ok((Err(e), _)) => return Err(e.into()),
+                        Ok(Ok(status)) => status,
+                        Ok(Err(e)) => return Err(e.into()),
                         Err(_) => {
-                            // Timeout — we lost ownership of child to the thread,
-                            // but the thread will finish eventually. Log the timeout.
+                            // Timeout — kill the orphaned child process via its PID
+                            // since ownership was moved into the wait thread.
+                            #[cfg(unix)]
+                            unsafe {
+                                libc::kill(child_pid as i32, libc::SIGKILL);
+                            }
                             let err_msg = "timed out after 60s";
                             crate::notifications::notify_command_error(&expanded_command, err_msg);
                             anyhow::bail!("Command timed out after 60s: {}", expanded_command);
@@ -293,6 +303,9 @@ impl Action {
                         .spawn()
                         .with_context(|| format!("Failed to run command: {}", actual_command))?;
 
+                    // Grab PID before moving child into wait thread (see shell branch above).
+                    let child_pid = child.id();
+
                     // Wait with a 60-second timeout using a channel
                     let timeout = std::time::Duration::from_secs(60);
                     let (tx, rx) = std::sync::mpsc::channel();
@@ -306,6 +319,10 @@ impl Action {
                         Ok(Ok(status)) => status,
                         Ok(Err(e)) => return Err(e.into()),
                         Err(_) => {
+                            #[cfg(unix)]
+                            unsafe {
+                                libc::kill(child_pid as i32, libc::SIGKILL);
+                            }
                             let err_msg = "timed out after 60s";
                             crate::notifications::notify_command_error(
                                 &actual_command_owned,

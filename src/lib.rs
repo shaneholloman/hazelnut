@@ -31,9 +31,13 @@ pub enum VersionCheck {
     CheckFailed(String),
 }
 
-/// Compare semver versions, returns true if `latest` is newer than `current`
+/// Compare semver versions, returns true if `latest` is newer than `current`.
+/// Pre-release suffixes (everything after `-`) are stripped before comparing.
 fn version_is_newer(latest: &str, current: &str) -> bool {
-    let parse = |v: &str| -> Vec<u32> { v.split('.').filter_map(|s| s.parse().ok()).collect() };
+    let parse = |v: &str| -> Vec<u32> {
+        let base = v.split('-').next().unwrap_or(v);
+        base.split('.').filter_map(|s| s.parse().ok()).collect()
+    };
 
     let latest_parts = parse(latest);
     let current_parts = parse(current);
@@ -51,21 +55,43 @@ fn version_is_newer(latest: &str, current: &str) -> bool {
     false
 }
 
-/// Expand ~ in a path to the user's home directory
+/// Expand ~ and environment variables ($VAR, ${VAR}) in a path
 pub fn expand_path(path: &std::path::Path) -> std::path::PathBuf {
     let path_str = path.to_string_lossy();
 
-    if let Some(stripped) = path_str.strip_prefix("~/") {
+    // First expand ~ prefix
+    let expanded = if let Some(stripped) = path_str.strip_prefix("~/") {
         if let Some(home) = dirs::home_dir() {
-            return home.join(stripped);
+            home.join(stripped).to_string_lossy().to_string()
+        } else {
+            path_str.to_string()
         }
-    } else if path_str == "~"
-        && let Some(home) = dirs::home_dir()
-    {
-        return home;
-    }
+    } else if path_str == "~" {
+        if let Some(home) = dirs::home_dir() {
+            home.to_string_lossy().to_string()
+        } else {
+            path_str.to_string()
+        }
+    } else {
+        path_str.to_string()
+    };
 
-    path.to_path_buf()
+    // Then expand $VAR and ${VAR} patterns
+    use std::sync::LazyLock;
+    static ENV_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)").expect("invalid env regex")
+    });
+
+    let result = ENV_RE.replace_all(&expanded, |caps: &regex::Captures| {
+        let var_name = caps
+            .get(1)
+            .or_else(|| caps.get(2))
+            .map(|m| m.as_str())
+            .unwrap_or("");
+        std::env::var(var_name).unwrap_or_else(|_| caps[0].to_string())
+    });
+
+    std::path::PathBuf::from(result.as_ref())
 }
 
 /// Detected package manager for installation
