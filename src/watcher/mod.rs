@@ -11,7 +11,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tracing::{debug, error, info};
 
-use crate::rules::RuleEngine;
+use crate::rules::{Rule, RuleEngine};
 
 /// File system watcher that monitors directories and applies rules
 pub struct Watcher {
@@ -72,11 +72,20 @@ impl Watcher {
 
         self.watcher.watch(path, mode)?;
         let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        self.watch_rules.insert(canonical, rules);
+        self.watch_rules.insert(canonical.clone(), rules);
         info!("Watching: {} (recursive: {})", path.display(), recursive);
 
-        // Initial scan
-        self.scan_existing(path, recursive);
+        // Initial scan — run in a background thread so TUI startup isn't blocked.
+        let scan_path = path.to_path_buf();
+        let scan_rules: Vec<Rule> = self.engine.rules().to_vec();
+        let allowed_rules: Option<Vec<String>> = self
+            .watch_rules
+            .get(&canonical)
+            .filter(|r| !r.is_empty())
+            .cloned();
+        std::thread::spawn(move || {
+            scan_existing_background(&scan_path, recursive, scan_rules, allowed_rules);
+        });
 
         Ok(())
     }
@@ -198,78 +207,71 @@ impl Watcher {
             _ => None,
         }
     }
+}
 
-    /// Scan existing files in a watched directory and apply matching rules.
-    /// This ensures age-based rules (e.g. "delete after 7 days") catch
-    /// files that were already present before the watcher started.
-    fn scan_existing(&mut self, path: &Path, recursive: bool) {
-        // Get allowed rules for this watch path
-        let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        let allowed_rules: Option<Vec<String>> = self
-            .watch_rules
-            .get(&canonical)
-            .filter(|r| !r.is_empty())
-            .cloned();
-        let allowed = allowed_rules.as_deref();
+/// Run the initial scan in a background thread so TUI startup isn't blocked.
+fn scan_existing_background(
+    path: &Path,
+    recursive: bool,
+    rules: Vec<Rule>,
+    allowed_rules: Option<Vec<String>>,
+) {
+    let engine = RuleEngine::new(rules);
+    let allowed = allowed_rules.as_deref();
 
-        let entries: Box<dyn Iterator<Item = std::fs::DirEntry>> = if recursive {
-            match walkdir(path) {
-                Ok(entries) => Box::new(entries.into_iter()),
-                Err(e) => {
-                    error!("Failed to scan directory {}: {}", path.display(), e);
-                    return;
-                }
+    let entries: Box<dyn Iterator<Item = std::fs::DirEntry>> = if recursive {
+        match walkdir(path) {
+            Ok(entries) => Box::new(entries.into_iter()),
+            Err(e) => {
+                error!("Failed to scan directory {}: {}", path.display(), e);
+                return;
             }
-        } else {
-            match std::fs::read_dir(path) {
-                Ok(rd) => Box::new(rd.filter_map(|e| e.ok())),
-                Err(e) => {
-                    error!("Failed to scan directory {}: {}", path.display(), e);
-                    return;
-                }
+        }
+    } else {
+        match std::fs::read_dir(path) {
+            Ok(rd) => Box::new(rd.filter_map(|e| e.ok())),
+            Err(e) => {
+                error!("Failed to scan directory {}: {}", path.display(), e);
+                return;
             }
-        };
+        }
+    };
 
-        let mut scanned = 0u64;
-        let mut matched = 0u64;
+    let mut scanned = 0u64;
+    let mut matched = 0u64;
 
-        for entry in entries {
-            let file_path = entry.path();
-            if file_path.is_file() {
-                scanned += 1;
-                match self.engine.process_filtered(&file_path, allowed) {
-                    Ok(true) => {
-                        matched += 1;
-                        self.files_processed += 1;
+    for entry in entries {
+        let file_path = entry.path();
+        if file_path.is_file() {
+            scanned += 1;
+            match engine.process_filtered(&file_path, allowed) {
+                Ok(true) => {
+                    matched += 1;
+                }
+                Ok(false) => {}
+                Err(e) => {
+                    if e.downcast_ref::<std::io::Error>()
+                        .is_some_and(|io_err| io_err.kind() == std::io::ErrorKind::NotFound)
+                    {
+                        debug!(
+                            "File disappeared before processing: {}",
+                            file_path.display()
+                        );
+                        continue;
                     }
-                    Ok(false) => {}
-                    Err(e) => {
-                        // Skip NotFound errors (file gone between scan and processing)
-                        if e.downcast_ref::<std::io::Error>()
-                            .is_some_and(|io_err| io_err.kind() == std::io::ErrorKind::NotFound)
-                        {
-                            debug!(
-                                "File disappeared before processing: {}",
-                                file_path.display()
-                            );
-                            continue;
-                        }
-                        error!("Rule processing failed for {}: {}", file_path.display(), e);
-                        let rule_name = self.find_matching_rule_name(&file_path);
-                        crate::notifications::notify_rule_error(&rule_name, &e.to_string());
-                    }
+                    error!("Rule processing failed for {}: {}", file_path.display(), e);
                 }
             }
         }
+    }
 
-        if scanned > 0 {
-            info!(
-                "Initial scan of {}: {} files scanned, {} matched rules",
-                path.display(),
-                scanned,
-                matched
-            );
-        }
+    if scanned > 0 {
+        info!(
+            "Background scan of {}: {} files scanned, {} matched rules",
+            path.display(),
+            scanned,
+            matched
+        );
     }
 }
 

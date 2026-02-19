@@ -1,9 +1,15 @@
 //! Rule actions - what to do with matched files
 
 use anyhow::{Context, Result};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use tracing::{debug, info};
+
+/// Pre-compiled regex for `{date:FORMAT}` patterns.
+static DATE_FORMAT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{date:([^}]+)\}").expect("invalid date format regex"));
 
 /// Action to perform on a matched file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,48 +150,50 @@ impl Action {
 
             Action::Trash => {
                 info!("Trashing {}", path.display());
-                // Use trash crate if available, otherwise move to ~/.local/share/Trash
-                // For now, just move to a trash folder
-                let trash_dir = dirs::data_dir()
-                    .map(|d| d.join("Trash").join("files"))
-                    .or_else(|| dirs::home_dir().map(|h| h.join(".local/share/Trash/files")))
-                    .unwrap_or_else(|| PathBuf::from("/tmp/trash"));
+                // Use the `trash` crate for proper .trashinfo / Finder integration.
+                // Fall back to a manual move if the crate fails (e.g. headless CI).
+                if let Err(e) = trash::delete(path) {
+                    debug!("trash crate failed ({}), falling back to manual move", e);
+                    let trash_dir = dirs::data_dir()
+                        .map(|d| d.join("Trash").join("files"))
+                        .or_else(|| dirs::home_dir().map(|h| h.join(".local/share/Trash/files")))
+                        .unwrap_or_else(|| PathBuf::from("/tmp/trash"));
 
-                std::fs::create_dir_all(&trash_dir)?;
+                    std::fs::create_dir_all(&trash_dir)?;
 
-                let filename = path.file_name().context("File has no name")?;
-                let mut trash_path = trash_dir.join(filename);
+                    let filename = path.file_name().context("File has no name")?;
+                    let mut trash_path = trash_dir.join(filename);
 
-                // Avoid overwriting existing files in trash
-                if trash_path.exists() {
-                    let stem = path
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    let ext = path
-                        .extension()
-                        .map(|e| format!(".{}", e.to_string_lossy()))
-                        .unwrap_or_default();
-                    let mut counter = 1u32;
-                    loop {
-                        if counter > 10000 {
-                            anyhow::bail!(
-                                "Too many duplicate files in trash for: {}",
-                                path.display()
-                            );
+                    if trash_path.exists() {
+                        let stem = path
+                            .file_stem()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        let ext = path
+                            .extension()
+                            .map(|e| format!(".{}", e.to_string_lossy()))
+                            .unwrap_or_default();
+                        let mut counter = 1u32;
+                        loop {
+                            if counter > 10000 {
+                                anyhow::bail!(
+                                    "Too many duplicate files in trash for: {}",
+                                    path.display()
+                                );
+                            }
+                            trash_path = trash_dir.join(format!("{}_{}{}", stem, counter, ext));
+                            if !trash_path.exists() {
+                                break;
+                            }
+                            counter += 1;
                         }
-                        trash_path = trash_dir.join(format!("{}_{}{}", stem, counter, ext));
-                        if !trash_path.exists() {
-                            break;
-                        }
-                        counter += 1;
                     }
-                }
 
-                if std::fs::rename(path, &trash_path).is_err() {
-                    std::fs::copy(path, &trash_path)?;
-                    std::fs::remove_file(path)?;
+                    if std::fs::rename(path, &trash_path).is_err() {
+                        std::fs::copy(path, &trash_path)?;
+                        std::fs::remove_file(path)?;
+                    }
                 }
             }
 
@@ -392,8 +400,7 @@ fn expand_pattern(pattern: &str, path: &Path) -> Result<String> {
     result = result.replace("{datetime}", &now.format("%Y-%m-%d_%H-%M-%S").to_string());
 
     // {date:FORMAT} - custom date format
-    let date_regex = regex::Regex::new(r"\{date:([^}]+)\}")?;
-    result = date_regex
+    result = DATE_FORMAT_RE
         .replace_all(&result, |caps: &regex::Captures| {
             let format = &caps[1];
             now.format(format).to_string()
@@ -440,8 +447,7 @@ fn expand_pattern_shell_escaped(pattern: &str, path: &Path) -> Result<String> {
     result = result.replace("{datetime}", &now.format("%Y-%m-%d_%H-%M-%S").to_string());
 
     // {date:FORMAT} - custom date format
-    let date_regex = regex::Regex::new(r"\{date:([^}]+)\}")?;
-    result = date_regex
+    result = DATE_FORMAT_RE
         .replace_all(&result, |caps: &regex::Captures| {
             let format = &caps[1];
             now.format(format).to_string()

@@ -330,10 +330,29 @@ mod unix_daemon {
     }
 
     async fn run_daemon(config_path: Option<std::path::PathBuf>) -> Result<()> {
+        use std::collections::VecDeque;
+        use std::sync::{Arc, Mutex};
         use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
         use tokio::signal::unix::{SignalKind, signal};
         use tokio::time::{Duration, interval};
         use tracing::info;
+
+        /// Maximum number of log entries kept in the ring buffer.
+        const MAX_LOG_ENTRIES: usize = 500;
+
+        // In-memory ring buffer for log entries returned by GetLog.
+        let log_buffer: Arc<Mutex<VecDeque<String>>> =
+            Arc::new(Mutex::new(VecDeque::with_capacity(MAX_LOG_ENTRIES)));
+
+        /// Push a message into the ring buffer, evicting the oldest if full.
+        fn push_log(buf: &Mutex<VecDeque<String>>, msg: String, max: usize) {
+            if let Ok(mut ring) = buf.lock() {
+                if ring.len() >= max {
+                    ring.pop_front();
+                }
+                ring.push_back(msg);
+            }
+        }
 
         // Write PID file for foreground mode too
         write_pid(std::process::id())?;
@@ -387,6 +406,15 @@ mod unix_daemon {
         }
 
         info!("Daemon running (PID: {})", std::process::id());
+        push_log(
+            &log_buffer,
+            format!(
+                "[{}] Daemon started (PID: {})",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                std::process::id()
+            ),
+            MAX_LOG_ENTRIES,
+        );
 
         // Poll for events periodically
         let mut poll_interval = interval(Duration::from_millis(500));
@@ -444,10 +472,14 @@ mod unix_daemon {
                 _ = poll_interval.tick() => {
                     match watcher.process_events() {
                         Ok(count) if count > 0 => {
+                            let msg = format!("[{}] Processed {} file(s)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), count);
                             info!("Processed {} files", count);
+                            push_log(&log_buffer, msg, MAX_LOG_ENTRIES);
                         }
                         Err(e) => {
+                            let msg = format!("[{}] Error: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), e);
                             tracing::error!("Error processing events: {}", e);
+                            push_log(&log_buffer, msg, MAX_LOG_ENTRIES);
                         }
                         _ => {}
                     }
@@ -483,9 +515,14 @@ mod unix_daemon {
                                         unsafe { libc::kill(std::process::id() as i32, libc::SIGHUP); }
                                         hazelnut::ipc::DaemonResponse::Ok
                                     }
-                                    hazelnut::ipc::DaemonCommand::GetLog { limit: _ } => {
-                                        // Log retrieval not yet tracked in-memory
-                                        hazelnut::ipc::DaemonResponse::Log { entries: vec![] }
+                                    hazelnut::ipc::DaemonCommand::GetLog { limit } => {
+                                        let entries = if let Ok(ring) = log_buffer.lock() {
+                                            let skip = ring.len().saturating_sub(limit);
+                                            ring.iter().skip(skip).cloned().collect()
+                                        } else {
+                                            vec![]
+                                        };
+                                        hazelnut::ipc::DaemonResponse::Log { entries }
                                     }
                                     hazelnut::ipc::DaemonCommand::GetStats => {
                                         hazelnut::ipc::DaemonResponse::Status {

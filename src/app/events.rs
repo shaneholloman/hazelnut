@@ -622,44 +622,29 @@ fn toggle_daemon(state: &mut AppState) {
         .filter(|p| p.exists())
         .unwrap_or_else(|| std::path::PathBuf::from("hazelnutd"));
 
-    if state.daemon_running {
-        // Stop daemon
-        match Command::new(&daemon_cmd)
-            .args(["stop"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-        {
-            Ok(status) if status.success() => {
+    let was_running = state.daemon_running;
+    let arg = if was_running { "stop" } else { "start" };
+
+    // Use spawn() instead of status() so we don't block the TUI event loop.
+    match Command::new(&daemon_cmd)
+        .args([arg])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(_child) => {
+            if was_running {
                 state.daemon_running = false;
                 state.watcher_needs_restart = true;
-                state.set_status("Daemon stopped");
-            }
-            Ok(_) => {
-                state.set_status("Failed to stop daemon");
-            }
-            Err(e) => {
-                state.set_status(format!("Error stopping daemon: {}", e));
+                state.set_status("Daemon stop requested");
+            } else {
+                state.daemon_running = true;
+                state.set_status("Daemon start requested");
             }
         }
-    } else {
-        // Start daemon
-        match Command::new(&daemon_cmd)
-            .args(["start"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-        {
-            Ok(status) if status.success() => {
-                state.daemon_running = true;
-                state.set_status("Daemon started");
-            }
-            Ok(_) => {
-                state.set_status("Failed to start daemon");
-            }
-            Err(e) => {
-                state.set_status(format!("Error starting daemon: {}", e));
-            }
+        Err(e) => {
+            let action = if was_running { "stopping" } else { "starting" };
+            state.set_status(format!("Error {} daemon: {}", action, e));
         }
     }
 }
